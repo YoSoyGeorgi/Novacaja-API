@@ -13,7 +13,7 @@ def preparar_datos_para_clave(df, clave):
     -----------
     df : DataFrame
         DataFrame de entrada con columnas [store_id, art_codigo, ds, y]
-    clave : tuple
+    clave : tuple o str
         La clave (store_id, art_codigo) o art_codigo para filtrar
         
     Retorna:
@@ -22,10 +22,13 @@ def preparar_datos_para_clave(df, clave):
     """
     try:
         # Filtrar para la clave específica
-        if isinstance(clave, tuple):
+        if isinstance(clave, tuple) and len(clave) > 1:
+            # Caso cuando by_store es True
             df_clave = df[(df['store_id'] == clave[0]) & (df['art_codigo'] == clave[1])].copy()
         else:
-            df_clave = df[df['art_codigo'] == clave].copy()
+            # Caso cuando by_store es False o clave es un string
+            art_codigo = clave[0] if isinstance(clave, tuple) else clave
+            df_clave = df[df['art_codigo'] == art_codigo].copy()
         
         # Asegurar que ds es datetime
         df_clave['ds'] = pd.to_datetime(df_clave['ds'])
@@ -394,7 +397,7 @@ if __name__ == "__main__":
     # Ejecutar pronóstico con 95% de nivel de servicio y manejo de atípicos
     json_results, report = run_forecast(
         sample_df, 
-        by_store=True, 
+        by_store=False, 
         nivel_servicio=0.95,
         manejar_atipicos=True,
         umbral_atipicos=3.0,

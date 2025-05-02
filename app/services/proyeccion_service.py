@@ -8,7 +8,7 @@ import logging
 # Configurar logger
 logger = logging.getLogger(__name__)
 
-async def calcular_proyeccion(datos_ventas: List[DatoVentaDiaria]) -> ProyeccionOutput:
+async def calcular_proyeccion(datos_ventas: List[DatoVentaDiaria], by_store: bool = True) -> ProyeccionOutput:
     """
     Servicio para calcular la proyección de ventas y stock recomendado
     
@@ -16,6 +16,8 @@ async def calcular_proyeccion(datos_ventas: List[DatoVentaDiaria]) -> Proyeccion
     -----------
     datos_ventas : List[DatoVentaDiaria]
         Lista de datos de ventas diarias
+    by_store : bool
+        Indica si el pronóstico debe realizarse por tienda
         
     Retorna:
     --------
@@ -28,7 +30,8 @@ async def calcular_proyeccion(datos_ventas: List[DatoVentaDiaria]) -> Proyeccion
         
         # Obtener resultados del DAO
         resultados = await ProyeccionDAO.obtener_proyeccion(
-            datos_ventas=datos_ventas_list
+            datos_ventas=datos_ventas_list,
+            by_store=by_store
         )
         
         # Convertir resultados al formato del DTO

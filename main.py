@@ -31,7 +31,7 @@ def health():
 async def proyeccion(input_data: ProyeccionInput):
     try:
         # Procesar la proyección directamente con los datos de ventas proporcionados
-        return await calcular_proyeccion(input_data.datos_ventas)
+        return await calcular_proyeccion(input_data.datos_ventas, input_data.by_store)
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Ocurrió un problema: {str(e)}")
 

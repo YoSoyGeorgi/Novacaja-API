@@ -41,6 +41,7 @@ class ResultadoProyeccion(BaseModel):
 
 class ProyeccionInput(BaseModel):
     datos_ventas: List[DatoVentaDiaria] = Field(..., description="Lista de datos de ventas diarias")
+    by_store: bool = Field(default=True, description="Indica si el pronóstico debe realizarse por tienda")
 
     model_config = {
         "json_schema_extra": {
@@ -52,7 +53,8 @@ class ProyeccionInput(BaseModel):
                         "store_id": "S1",
                         "art_codigo": "P1"
                     }
-                ]
+                ],
+                "by_store": True
             }
         }
     }

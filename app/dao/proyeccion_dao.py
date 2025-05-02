@@ -7,7 +7,7 @@ import numpy as np
 
 class ProyeccionDAO:
     @staticmethod
-    async def obtener_proyeccion(datos_ventas: list):
+    async def obtener_proyeccion(datos_ventas: list, by_store: bool = True):
         """
         Obtiene la proyección utilizando el modelo de pronóstico
         
@@ -15,6 +15,8 @@ class ProyeccionDAO:
         -----------
         datos_ventas : list
             Lista de datos de ventas diarias
+        by_store : bool
+            Indica si el pronóstico debe realizarse por tienda
             
         Retorna:
         --------
@@ -53,7 +55,7 @@ class ProyeccionDAO:
             # Ejecutar el pronóstico con valores predeterminados
             json_results, report_text = run_forecast(
                 input_df=df,
-                by_store=True,  # Analizar por sucursal por defecto
+                by_store=by_store,  # Usar el valor proporcionado
                 nivel_servicio=0.95,
                 manejar_atipicos=True,
                 umbral_atipicos=3.0,
@@ -71,7 +73,7 @@ class ProyeccionDAO:
                 if '_' in key:
                     id_sucursal, art_codigo = key.split('_', 1)
                 else:
-                    id_sucursal = "desconocida"
+                    id_sucursal = "global"
                     art_codigo = key
                 
                 # Crear objeto de resultado
