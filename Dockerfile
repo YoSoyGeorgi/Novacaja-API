@@ -9,6 +9,7 @@ COPY requirements.txt .
 # Copia los archivos y carpetas necesarios al contenedor
 COPY ./app /app/app
 COPY ./main.py /app/main.py
+COPY README.md /app/README.md
 
 # 1. Instala build-tools (si lo necesitas)
 RUN apt-get update \
