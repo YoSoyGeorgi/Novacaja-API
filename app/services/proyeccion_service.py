@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 # Constantes para optimización
 MAX_MEMORY_PERCENT = 90  # Porcentaje máximo de memoria a utilizar
 MIN_MEMORY_REQUIRED_MB = 1024  # Memoria mínima requerida en MB
-NUM_WORKERS = 4  # Número de workers (uno por núcleo físico)
+NUM_WORKERS = multiprocessing.cpu_count() # Número de workers (uno por núcleo físico)
 BATCH_SIZE = 50  # Tamaño del lote para procesamiento
 CHUNK_SIZE = 10  # Tamaño del chunk para el ProcessPoolExecutor
 MIN_SERIES_LENGTH = 2  # Mínimo de puntos de datos para considerar una serie válida
