@@ -1,98 +1,127 @@
-# API de Proyección de Ventas
+# API de Proyección de Ventas - NOVACAJA
 
-Esta API permite calcular proyecciones de ventas y recomendaciones de stock utilizando un modelo de serie temporal.
+👋 Introducción
+Bienvenido al espacio de trabajo de la API de Proyección de Ventas de NOVACAJA. Este espacio contiene colecciones de Postman que puedes usar para probar y compartir nuestra API con los consumidores.
 
-## Estructura del Proyecto
+## 🚀 Comenzando con este espacio de trabajo
 
-La aplicación sigue una arquitectura orientada a servicios con tres capas principales:
+En este espacio de trabajo, encontrarás colecciones de Postman que ayudan a entender y consumir nuestra API de proyección de ventas.
 
-- **DTO (Data Transfer Objects)**: Define las estructuras de datos para la entrada y salida de la API.
-- **Services**: Contiene la lógica de negocio que conecta los endpoints con los DAOs.
-- **DAO (Data Access Objects)**: Maneja la interacción con el modelo de pronóstico.
+### Colecciones de Referencia
+Estas colecciones contienen todas las peticiones y documentación asociada con la API. Comparte esto con los clientes para proporcionar una visión completa de nuestra API y cómo usarla.
 
-## Endpoints
+### Colecciones de Ejemplos
+Estas colecciones ilustran casos de uso reales donde nuestra API puede ser utilizada. Úsalas para demostrar las capacidades de nuestra API a los consumidores.
+
+## 📋 Endpoints Disponibles
 
 ### Verificar Estado
-
 ```
 GET /health
 ```
-
 Retorna el estado de la API.
 
 ### Calcular Proyección
-
 ```
 POST /proyeccion
 ```
-
 Calcula una proyección de ventas y recomendación de stock basada en datos históricos.
 
-#### Cuerpo de la Solicitud
-
+#### Ejemplo de Solicitud
 ```json
 {
-  "store_id": "string",
-  "art_codigo": "string",
   "datos_ventas": [
     {
-      "store_id": "string",
-      "art_codigo": "string",
-      "ds": "YYYY-MM-DD",
-      "y": 0
+      "art_codigo": "P1",
+      "ds": "2025-04-12",
+      "store_id": "S1",
+      "y": 100
+    },
+    {
+      "art_codigo": "P1",
+      "ds": "2025-04-13",
+      "store_id": "S1",
+      "y": 105
     }
   ],
-  "by_store": true,
-  "nivel_servicio": 0.95,
-  "manejar_atipicos": true,
-  "umbral_atipicos": 3.0,
-  "lead_time": 1
+  "by_store": true
 }
 ```
 
-#### Respuesta
-
+#### Ejemplo de Respuesta
 ```json
 {
-  "store_id": "string",
-  "art_codigo": "string",
-  "forecast_values": [
+  "resultados": [
     {
-      "ds": "YYYY-MM-DD",
-      "yhat": 0,
-      "yhat_lower": 0,
-      "yhat_upper": 0
+      "id_sucursal": "S1",
+      "art_codigo": "P1",
+      "demanda_pronosticada_7d": 100,
+      "demanda_pronosticada_30d": 200,
+      "stock_seguridad_7d": 50,
+      "stock_seguridad_30d": 100,
+      "stock_recomendado_7d": 75,
+      "stock_recomendado_30d": 150,
+      "intervalo_confianza_inferior": 70,
+      "intervalo_confianza_superior": 130,
+      "tendencia": "creciente"
     }
   ],
-  "stock_recomendado": 0,
-  "mensaje": "string"
+  "fecha_calculo": "2024-04-12T15:30:00",
+  "mensaje": "Proyección calculada exitosamente"
 }
 ```
 
-### Obtener README
-
+### Obtener Ejemplo
 ```
-GET /readme
+GET /ejemplo
+```
+Devuelve un ejemplo de datos para usar en el endpoint de proyección.
+
+## 🌍 Entornos
+
+Los entornos están configurados para manejar variables como:
+- URLs base
+- Tokens de autenticación
+- Configuraciones específicas del entorno (desarrollo, staging, producción)
+
+### Variables de Entorno
+```json
+{
+  "base_url": "http://localhost:8000",
+  "api_version": "v1"
+}
 ```
 
-Retorna el contenido de este archivo README.
+## ⭐️ Mejores Prácticas
 
-## Cómo Ejecutar
+1. **Seguridad**
+   - Nunca expongas claves de API durante las demostraciones
+   - Usa siempre variables de entorno para la autenticación
+   - Al compartir entornos con clientes, asegúrate de que no contengan claves de API
 
-1. Instalar dependencias:
-   ```
-   pip install -r requirements.txt
-   ```
+2. **Compartir Colecciones**
+   - Para compartir la misma colección con clientes repetidamente, considera usar un espacio de trabajo público
+   - Alternativamente, puedes exportar y compartir colecciones y entornos
 
-2. Iniciar el servidor:
-   ```
-   uvicorn main:app --reload
-   ```
+3. **Visualización**
+   - Usa el visualizador de Postman para demostrar las respuestas clave de las peticiones
 
-3. Acceder a la documentación de la API:
-   ```
-   http://localhost:8000/docs
-   ```
+## 🛟 Ayuda y Soporte
+
+Si tienes alguna pregunta o sugerencia, no dudes en contactar al equipo de soporte técnico de NOVACAJA.
+
+## 📚 Recursos Adicionales
+
+- [Documentación de la API](https://docs.novacaja.com)
+- [Guía de Integración](https://docs.novacaja.com/integration)
+- [Preguntas Frecuentes](https://docs.novacaja.com/faq)
+
+## 🔄 Actualizaciones
+
+- **v1.0.0**: Versión inicial de la API
+  - Endpoint de proyección de ventas
+  - Soporte para pronóstico por tienda y global
+  - Cálculo de stock de seguridad y recomendaciones
 
 # Sistema de Pronóstico de Ventas y Planificación de Inventario - NOVACAJA
 
