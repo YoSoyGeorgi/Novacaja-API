@@ -259,7 +259,8 @@ def run_forecast(input_df, by_store=True, nivel_servicio=0.95, manejar_atipicos=
             changepoint_prior_scale=0.001,
             seasonality_prior_scale=10.0,
             seasonality_mode='multiplicative',
-            holidays_prior_scale=0.01
+            holidays_prior_scale=0.01,
+            uncertainty_samples=100
         )
         
         # Agregar feriados mexicanos para ajuste consistente
