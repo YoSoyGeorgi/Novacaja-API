@@ -150,24 +150,20 @@ def generar_reporte_final(resultados: Dict, errores: List[str], tiempo_total: fl
 async def calcular_proyeccion(datos_ventas: List[DatoVentaDiaria], by_store: bool = True) -> ProyeccionOutput:
     """
     Servicio optimizado para calcular la proyección de ventas y stock recomendado
+    Ahora los workers procesan por tienda (store_id), no por producto.
     """
     try:
-        # Verificar memoria disponible
         memoria_disponible_mb = psutil.virtual_memory().available / (1024 * 1024)
         if memoria_disponible_mb < MIN_MEMORY_REQUIRED_MB:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Memoria insuficiente para procesar la solicitud"
             )
-        
-        # Validar datos de entrada
         if not datos_ventas:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="No se proporcionaron datos de ventas"
             )
-        
-        # Convertir datos a DataFrame de manera eficiente
         try:
             df = pd.DataFrame({
                 'store_id': np.array([d.store_id for d in datos_ventas]),
@@ -181,67 +177,49 @@ async def calcular_proyeccion(datos_ventas: List[DatoVentaDiaria], by_store: boo
                 detail=f"Error al procesar datos de entrada: {str(e)}"
             )
 
-        # Agrupar datos por artículo y preparar lotes
+        # Agrupar por tienda (store_id)
+        tiendas_por_lote = defaultdict(list)
+        for store_id, grupo_tienda in df.groupby('store_id'):
+            # Para cada tienda, agrupar por producto
+            productos = []
+            for art_codigo, grupo_producto in grupo_tienda.groupby('art_codigo'):
+                if len(grupo_producto) >= MIN_SERIES_LENGTH:
+                    productos.append({
+                        "store_id": store_id,
+                        "art_codigo": art_codigo,
+                        "ds": grupo_producto['ds'].tolist(),
+                        "y": grupo_producto['y'].tolist()
+                    })
+            if productos:
+                tiendas_por_lote[store_id] = productos
+
+        # Procesar lotes de tiendas en paralelo
         resultados_totales = []
-        articulos_por_lote = defaultdict(list)
-        
-        # Agrupar por artículo primero
-        for art_codigo, grupo_articulo in df.groupby('art_codigo'):
-            # Verificar si el artículo tiene suficientes datos
-            if len(grupo_articulo) < MIN_SERIES_LENGTH:
-                logger.warning(f"Artículo {art_codigo} tiene insuficientes datos")
-                continue
-                
-            # Agrupar por tienda si by_store es True
-            if by_store:
-                for store_id, grupo_tienda in grupo_articulo.groupby('store_id'):
-                    if len(grupo_tienda) >= MIN_SERIES_LENGTH:
-                        articulos_por_lote[art_codigo].append({
-                            "store_id": store_id,
-                            "art_codigo": art_codigo,
-                            "ds": grupo_tienda['ds'].tolist(),
-                            "y": grupo_tienda['y'].tolist()
-                        })
-            else:
-                # Si no es by_store, procesar todo el artículo junto
-                articulos_por_lote[art_codigo].append({
-                    "store_id": "global",
-                    "art_codigo": art_codigo,
-                    "ds": grupo_articulo['ds'].tolist(),
-                    "y": grupo_articulo['y'].tolist()
-                })
-
-        # Procesar lotes de artículos
-        for art_codigo, series in articulos_por_lote.items():
-            if not series:
-                continue
-                
-            logger.info(f"Procesando artículo {art_codigo} con {len(series)} series")
-            
-            try:
-                # Procesar todas las series del artículo juntas
-                resultados_articulo = await ProyeccionDAO.obtener_proyeccion(
-                    datos_ventas=series,
-                    by_store=by_store
+        with ProcessPoolExecutor(max_workers=NUM_WORKERS) as executor:
+            futures = []
+            for store_id, productos in tiendas_por_lote.items():
+                # Cada worker recibe todos los productos de una tienda
+                future = executor.submit(
+                    ProyeccionDAO.obtener_proyeccion_sync,  # Debe ser función síncrona
+                    productos,
+                    by_store
                 )
-                
-                if resultados_articulo:
-                    resultados_totales.extend(resultados_articulo)
-                
-            except Exception as e:
-                logger.error(f"Error procesando artículo {art_codigo}: {str(e)}")
-                continue
-
-            # Liberar memoria después de cada artículo
-            gc.collect()
+                futures.append((store_id, future))
+            for store_id, future in futures:
+                try:
+                    resultados_tienda = future.result()
+                    if resultados_tienda:
+                        resultados_totales.extend(resultados_tienda)
+                except Exception as e:
+                    logger.error(f"Error procesando tienda {store_id}: {str(e)}")
+                    continue
+                gc.collect()
 
         if not resultados_totales:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="No se pudo procesar ninguna serie temporal"
             )
-
-        # Convertir resultados al formato del DTO
         resultados_formateados = [
             ResultadoProyeccion(
                 id_sucursal=r["id_sucursal"],
@@ -258,13 +236,11 @@ async def calcular_proyeccion(datos_ventas: List[DatoVentaDiaria], by_store: boo
             )
             for r in resultados_totales
         ]
-
         return ProyeccionOutput(
             resultados=resultados_formateados,
             fecha_calculo=datetime.now(),
             mensaje=f"Proyección calculada exitosamente para {len(resultados_formateados)} series temporales"
         )
-
     except HTTPException as he:
         raise he
     except Exception as e:

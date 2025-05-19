@@ -40,21 +40,12 @@ class ResultadoProyeccion(BaseModel):
     }
 
 class ProyeccionInput(BaseModel):
-    datos_ventas: List[DatoVentaDiaria] = Field(..., description="Lista de datos de ventas diarias")
-    by_store: bool = Field(default=True, description="Indica si el pronóstico debe realizarse por tienda")
+    url_archivo: str = Field(..., description="URL del archivo JSON que contiene los datos de ventas y configuración")
 
     model_config = {
         "json_schema_extra": {
             "example": {
-                "datos_ventas": [
-                    {
-                        "ds": "2023-01-01",
-                        "y": 100,
-                        "store_id": "S1",
-                        "art_codigo": "P1"
-                    }
-                ],
-                "by_store": True
+                "url_archivo": "https://ejemplo.com/datos_ventas.json"
             }
         }
     }

@@ -7,6 +7,10 @@ from typing import List, Union
 import pandas as pd
 import numpy as np
 import random
+import requests
+import json
+import tempfile
+import shutil
 
 app = FastAPI(
     title="Novacaja API de Proyección",
@@ -27,11 +31,56 @@ DEFAULTS = {
 def health():
     return {"status": "ok"}
 
-@app.post("/proyeccion", response_model=ProyeccionOutput, responses={404: {"description": "Ocurrió un problema del lado del servidor del modelo, intente nuevamente"}})
+@app.post("/proyeccion", response_model=ProyeccionOutput, responses={
+    404: {"description": "Ocurrió un problema del lado del servidor del modelo, intente nuevamente"},
+    400: {"description": "Error al procesar el archivo JSON o URL inválida"}
+})
 async def proyeccion(input_data: ProyeccionInput):
     try:
-        # Procesar la proyección directamente con los datos de ventas proporcionados
-        return await calcular_proyeccion(input_data.datos_ventas, input_data.by_store)
+        # Crear un directorio temporal
+        temp_dir = tempfile.mkdtemp()
+        temp_file_path = os.path.join(temp_dir, "datos_ventas.json")
+        
+        try:
+            # Descargar el archivo
+            response = requests.get(input_data.url_archivo)
+            response.raise_for_status()  # Lanza una excepción si hay error HTTP
+            
+            # Guardar el archivo temporalmente
+            with open(temp_file_path, 'wb') as f:
+                f.write(response.content)
+            
+            # Leer y validar el JSON
+            with open(temp_file_path, 'r', encoding='utf-8') as f:
+                json_data = json.load(f)
+            
+            # Validar la estructura del JSON
+            if not isinstance(json_data, dict):
+                raise HTTPException(status_code=400, detail="El archivo JSON debe ser un objeto")
+            
+            if 'datos_ventas' not in json_data:
+                raise HTTPException(status_code=400, detail="El archivo JSON debe contener una clave 'datos_ventas'")
+            
+            if 'by_store' not in json_data:
+                raise HTTPException(status_code=400, detail="El archivo JSON debe contener una clave 'by_store'")
+            
+            if not isinstance(json_data['by_store'], bool):
+                raise HTTPException(status_code=400, detail="El valor de 'by_store' debe ser un booleano")
+            
+            # Convertir los datos a DatoVentaDiaria
+            datos_ventas = [DatoVentaDiaria(**venta) for venta in json_data['datos_ventas']]
+            
+            # Procesar la proyección usando by_store del JSON
+            return await calcular_proyeccion(datos_ventas, json_data['by_store'])
+            
+        finally:
+            # Limpiar: eliminar el directorio temporal y su contenido
+            shutil.rmtree(temp_dir)
+            
+    except requests.RequestException as e:
+        raise HTTPException(status_code=400, detail=f"Error al descargar el archivo: {str(e)}")
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="El archivo no contiene un JSON válido")
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Ocurrió un problema: {str(e)}")
 
