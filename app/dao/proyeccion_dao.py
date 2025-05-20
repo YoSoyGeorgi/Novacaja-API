@@ -14,7 +14,7 @@ import multiprocessing
 logger = logging.getLogger(__name__)
 
 # Constantes para optimización
-MAX_WORKERS = 4  # Usar todos los núcleos disponibles
+MAX_WORKERS = multiprocessing.cpu_count()  # Usar todos los núcleos disponibles
 print(MAX_WORKERS)
 BATCH_SIZE = 1000  # Tamaño de lote para procesamiento en paralelo
 
