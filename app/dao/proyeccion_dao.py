@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 # Constantes para optimización
 MAX_WORKERS = 4  # Usar todos los núcleos disponibles
-print("Cantidad de cpus" + MAX_WORKERS)
+print(MAX_WORKERS)
 BATCH_SIZE = 1000  # Tamaño de lote para procesamiento en paralelo
 
 class ProyeccionDAO:
