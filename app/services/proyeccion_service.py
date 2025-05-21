@@ -37,16 +37,16 @@ def calcular_tamano_bloque(num_tiendas: int, num_articulos: int) -> tuple:
     # Calcular el número total de series a procesar
     total_series = num_tiendas * num_articulos
     
-    # Asegurar que tengamos suficientes bloques para mantener ocupados todos los workers
-    num_bloques_minimo = NUM_WORKERS * 32  # Mínimo de bloques para mantener ocupados todos los workers
+    # Asegurar que tengamos muchos más bloques que workers para mejor distribución
+    num_bloques_minimo = NUM_WORKERS * 64  # Aumentar significativamente el número de bloques
     
     # Ajustar el tamaño del bloque según la relación y el total de series
     if ratio > 5:  # Más tiendas que artículos
-        # Para muchas tiendas, crear bloques más pequeños
+        # Para muchas tiendas, crear bloques muy pequeños
         tiendas_por_bloque = max(1, num_tiendas // num_bloques_minimo)
         return (tiendas_por_bloque, 1)
     elif ratio < 0.2:  # Más artículos que tiendas
-        # Para muchos artículos, crear bloques más pequeños
+        # Para muchos artículos, crear bloques muy pequeños
         articulos_por_bloque = max(1, num_articulos // num_bloques_minimo)
         return (1, articulos_por_bloque)
     else:  # Relación balanceada
@@ -142,13 +142,13 @@ async def calcular_proyeccion(datos_ventas: List[DatoVentaDiaria], by_store: boo
                     bloques.append(tiendas_bloque)
 
         # Asegurar que tengamos suficientes bloques para los workers
-        if len(bloques) < NUM_WORKERS * 2:
+        if len(bloques) < NUM_WORKERS * 4:
             # Dividir los bloques existentes en más bloques más pequeños
             bloques_originales = bloques
             bloques = []
             for bloque in bloques_originales:
                 # Dividir cada bloque en partes más pequeñas para mejor distribución
-                tamano_parte = max(1, len(bloque) // (NUM_WORKERS * 2))
+                tamano_parte = max(1, len(bloque) // (NUM_WORKERS * 4))
                 for i in range(0, len(bloque), tamano_parte):
                     parte = bloque[i:i + tamano_parte]
                     if parte:
