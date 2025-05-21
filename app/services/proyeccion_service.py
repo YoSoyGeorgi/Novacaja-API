@@ -47,11 +47,23 @@ def calcular_tamano_bloque(num_tiendas: int, num_articulos: int) -> tuple:
         articulos_por_bloque = max(1, num_articulos // (NUM_WORKERS * 4))
         return (1, articulos_por_bloque)
     else:  # Relación balanceada
-        # Calcular un tamaño de bloque que mantenga ocupados todos los workers
-        elementos_por_bloque = max(1, total_series // (NUM_WORKERS * 4))
-        # Distribuir elementos entre tiendas y artículos de manera proporcional
-        tiendas_por_bloque = max(1, int(elementos_por_bloque * (num_tiendas / total_series)))
-        articulos_por_bloque = max(1, int(elementos_por_bloque * (num_articulos / total_series)))
+        # Para casos balanceados, crear bloques más pequeños para mejor distribución
+        # Calcular el número óptimo de bloques basado en el total de series
+        num_bloques_optimo = NUM_WORKERS * 8  # Asegurar suficientes bloques para todos los workers
+        elementos_por_bloque = max(1, total_series // num_bloques_optimo)
+        
+        # Calcular proporciones para tiendas y artículos
+        prop_tiendas = num_tiendas / (num_tiendas + num_articulos)
+        prop_articulos = num_articulos / (num_tiendas + num_articulos)
+        
+        # Distribuir elementos proporcionalmente
+        tiendas_por_bloque = max(1, int(elementos_por_bloque * prop_tiendas))
+        articulos_por_bloque = max(1, int(elementos_por_bloque * prop_articulos))
+        
+        # Asegurar que no haya bloques demasiado grandes
+        tiendas_por_bloque = min(tiendas_por_bloque, num_tiendas // NUM_WORKERS)
+        articulos_por_bloque = min(articulos_por_bloque, num_articulos // NUM_WORKERS)
+        
         return (tiendas_por_bloque, articulos_por_bloque)
 
 async def calcular_proyeccion(datos_ventas: List[DatoVentaDiaria], by_store: bool = True) -> ProyeccionOutput:
