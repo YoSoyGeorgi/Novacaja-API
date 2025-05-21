@@ -11,12 +11,16 @@ import requests
 import json
 import tempfile
 import shutil
+import asyncio
 
 app = FastAPI(
     title="Novacaja API de Proyección",
     description="API para calcular proyecciones de ventas y recomendaciones de stock",
     version="1.0.0"
 )
+
+# Crear un lock global para el endpoint de proyección
+proyeccion_lock = asyncio.Lock()
 
 # Valores predeterminados para parámetros opcionales
 DEFAULTS = {
@@ -33,9 +37,17 @@ def health():
 
 @app.post("/proyeccion", response_model=ProyeccionOutput, responses={
     404: {"description": "Ocurrió un problema del lado del servidor del modelo, intente nuevamente"},
-    400: {"description": "Error al procesar el archivo JSON o URL inválida"}
+    400: {"description": "Error al procesar el archivo JSON o URL inválida"},
+    503: {"description": "El servicio está ocupado procesando otra solicitud"}
 })
 async def proyeccion(input_data: ProyeccionInput):
+    # Intentar adquirir el lock
+    if not await proyeccion_lock.acquire():
+        raise HTTPException(
+            status_code=503,
+            detail="El servicio está ocupado procesando otra solicitud. Por favor, intente nuevamente en unos momentos."
+        )
+    
     try:
         # Crear un directorio temporal
         temp_dir = tempfile.mkdtemp()
@@ -83,6 +95,9 @@ async def proyeccion(input_data: ProyeccionInput):
         raise HTTPException(status_code=400, detail="El archivo no contiene un JSON válido")
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Ocurrió un problema: {str(e)}")
+    finally:
+        # Liberar el lock
+        proyeccion_lock.release()
 
 @app.get("/readme")
 async def get_readme():
