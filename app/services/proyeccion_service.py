@@ -36,12 +36,12 @@ def calcular_tamano_bloque(num_tiendas: int, num_articulos: int) -> tuple:
     
     # Ajustar el tamaño del bloque según la relación
     if ratio > 10:  # Muchas tiendas, pocos artículos
-        # Ajustar el tamaño del bloque para optimizar el uso de núcleos
-        tiendas_por_bloque = max(1, num_tiendas // (NUM_WORKERS * 2))
+        # Asegurar que tengamos al menos NUM_WORKERS bloques
+        tiendas_por_bloque = max(1, num_tiendas // (NUM_WORKERS * 4))
         return (tiendas_por_bloque, 1)  # (tiendas_por_bloque, articulos_por_bloque)
     elif ratio < 0.1:  # Pocas tiendas, muchos artículos
-        # Ajustar el tamaño del bloque para optimizar el uso de núcleos
-        articulos_por_bloque = max(1, num_articulos // (NUM_WORKERS * 2))
+        # Asegurar que tengamos al menos NUM_WORKERS bloques
+        articulos_por_bloque = max(1, num_articulos // (NUM_WORKERS * 4))
         return (1, articulos_por_bloque)  # (tiendas_por_bloque, articulos_por_bloque)
     else:  # Relación balanceada
         return (50, 50)  # (tiendas_por_bloque, articulos_por_bloque)
@@ -120,17 +120,36 @@ async def calcular_proyeccion(datos_ventas: List[DatoVentaDiaria], by_store: boo
                 if tiendas_bloque:
                     bloques.append(tiendas_bloque)
 
+        # Asegurar que tengamos suficientes bloques para los workers
+        if len(bloques) < NUM_WORKERS:
+            # Dividir los bloques existentes en más bloques más pequeños
+            bloques_originales = bloques
+            bloques = []
+            for bloque in bloques_originales:
+                # Dividir cada bloque en NUM_WORKERS partes
+                tamano_parte = max(1, len(bloque) // NUM_WORKERS)
+                for i in range(0, len(bloque), tamano_parte):
+                    parte = bloque[i:i + tamano_parte]
+                    if parte:
+                        bloques.append(parte)
+
         # Procesar bloques en paralelo
         resultados_totales = []
         with ProcessPoolExecutor(max_workers=NUM_WORKERS) as executor:
+            # Crear un diccionario para rastrear qué worker está procesando qué bloque
+            worker_assignments = {}
+            
+            # Asignar bloques a workers de manera round-robin
             futures = []
-            for bloque in bloques:
+            for i, bloque in enumerate(bloques):
+                worker_id = i % NUM_WORKERS
                 future = executor.submit(
                     ProyeccionDAO.obtener_proyeccion_sync,
                     bloque,
                     by_store
                 )
                 futures.append(future)
+                worker_assignments[future] = worker_id
 
             # Recolectar resultados
             for future in as_completed(futures):
@@ -139,7 +158,7 @@ async def calcular_proyeccion(datos_ventas: List[DatoVentaDiaria], by_store: boo
                     if resultados_bloque:
                         resultados_totales.extend(resultados_bloque)
                 except Exception as e:
-                    logger.error(f"Error procesando bloque: {str(e)}")
+                    logger.error(f"Error procesando bloque en worker {worker_assignments[future]}: {str(e)}")
                     continue
                 finally:
                     gc.collect()
