@@ -36,7 +36,9 @@ def calcular_tamano_bloque(num_tiendas: int, num_articulos: int) -> tuple:
     
     # Ajustar el tamaño del bloque según la relación
     if ratio > 10:  # Muchas tiendas, pocos artículos
-        return (100, 1)  # (tiendas_por_bloque, articulos_por_bloque)
+        # Ajustar el tamaño del bloque para optimizar el uso de núcleos
+        tiendas_por_bloque = max(1, num_tiendas // (NUM_WORKERS * 2))
+        return (tiendas_por_bloque, 1)  # (tiendas_por_bloque, articulos_por_bloque)
     elif ratio < 0.1:  # Pocas tiendas, muchos artículos
         return (1, 100)  # (tiendas_por_bloque, articulos_por_bloque)
     else:  # Relación balanceada
@@ -81,23 +83,22 @@ async def calcular_proyeccion(datos_ventas: List[DatoVentaDiaria], by_store: boo
         bloques = []
         if by_store:
             # Agrupar por tienda
-            for store_id, grupo_tienda in df.groupby('store_id'):
-                # Para cada tienda, agrupar por artículo
-                articulos = []
-                for art_codigo, grupo_producto in grupo_tienda.groupby('art_codigo'):
-                    if len(grupo_producto) >= MIN_SERIES_LENGTH:
-                        articulos.append({
-                            "store_id": store_id,
-                            "art_codigo": art_codigo,
-                            "ds": grupo_producto['ds'].tolist(),
-                            "y": grupo_producto['y'].tolist()
-                        })
-                if articulos:
-                    # Dividir artículos en bloques más pequeños
-                    for i in range(0, len(articulos), articulos_por_bloque):
-                        bloque = articulos[i:i + articulos_por_bloque]
-                        if bloque:
-                            bloques.append(bloque)
+            tiendas_grupos = list(df.groupby('store_id'))
+            # Dividir tiendas en bloques más pequeños
+            for i in range(0, len(tiendas_grupos), tiendas_por_bloque):
+                bloque_tiendas = tiendas_grupos[i:i + tiendas_por_bloque]
+                articulos_bloque = []
+                for store_id, grupo_tienda in bloque_tiendas:
+                    for art_codigo, grupo_producto in grupo_tienda.groupby('art_codigo'):
+                        if len(grupo_producto) >= MIN_SERIES_LENGTH:
+                            articulos_bloque.append({
+                                "store_id": store_id,
+                                "art_codigo": art_codigo,
+                                "ds": grupo_producto['ds'].tolist(),
+                                "y": grupo_producto['y'].tolist()
+                            })
+                if articulos_bloque:
+                    bloques.append(articulos_bloque)
         else:
             # Agrupar por artículo
             for art_codigo, grupo_articulo in df.groupby('art_codigo'):
