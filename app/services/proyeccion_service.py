@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 # Constantes para optimización
 MAX_MEMORY_PERCENT = 90  # Porcentaje máximo de memoria a utilizar
 MIN_MEMORY_REQUIRED_MB = 1024  # Memoria mínima requerida en MB
-NUM_WORKERS = multiprocessing.cpu_count()  # Número de workers (uno por núcleo físico)
+NUM_WORKERS = len(psutil.cpu_freq(percpu=True))  # Número de workers (uno por núcleo físico)
 MIN_SERIES_LENGTH = 2
 
 def calcular_tamano_bloque(num_tiendas: int, num_articulos: int) -> tuple:
