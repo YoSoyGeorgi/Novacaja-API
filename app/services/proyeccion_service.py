@@ -37,20 +37,21 @@ def calcular_tamano_bloque(num_tiendas: int, num_articulos: int) -> tuple:
     # Calcular el número total de series a procesar
     total_series = num_tiendas * num_articulos
     
+    # Asegurar que tengamos suficientes bloques para mantener ocupados todos los workers
+    num_bloques_minimo = NUM_WORKERS * 32  # Mínimo de bloques para mantener ocupados todos los workers
+    
     # Ajustar el tamaño del bloque según la relación y el total de series
     if ratio > 5:  # Más tiendas que artículos
-        # Para muchas tiendas, crear bloques más pequeños para mejor distribución
-        tiendas_por_bloque = max(1, num_tiendas // (NUM_WORKERS * 16))
+        # Para muchas tiendas, crear bloques más pequeños
+        tiendas_por_bloque = max(1, num_tiendas // num_bloques_minimo)
         return (tiendas_por_bloque, 1)
     elif ratio < 0.2:  # Más artículos que tiendas
-        # Para muchos artículos, mantener el tamaño actual que funciona bien
-        articulos_por_bloque = max(1, num_articulos // (NUM_WORKERS * 16))
+        # Para muchos artículos, crear bloques más pequeños
+        articulos_por_bloque = max(1, num_articulos // num_bloques_minimo)
         return (1, articulos_por_bloque)
     else:  # Relación balanceada
-        # Para casos balanceados, crear bloques más pequeños para mejor distribución
-        # Calcular el número óptimo de bloques basado en el total de series
-        num_bloques_optimo = NUM_WORKERS * 32  # Asegurar suficientes bloques para todos los workers
-        elementos_por_bloque = max(1, total_series // num_bloques_optimo)
+        # Para casos balanceados, calcular el tamaño óptimo de bloque
+        elementos_por_bloque = max(1, total_series // num_bloques_minimo)
         
         # Calcular proporciones para tiendas y artículos
         prop_tiendas = num_tiendas / (num_tiendas + num_articulos)
