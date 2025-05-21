@@ -49,7 +49,7 @@ def calcular_tamano_bloque(num_tiendas: int, num_articulos: int) -> tuple:
     else:  # Relación balanceada
         # Para casos balanceados, crear bloques más pequeños para mejor distribución
         # Calcular el número óptimo de bloques basado en el total de series
-        num_bloques_optimo = NUM_WORKERS * 8  # Asegurar suficientes bloques para todos los workers
+        num_bloques_optimo = NUM_WORKERS * 32  # Asegurar suficientes bloques para todos los workers
         elementos_por_bloque = max(1, total_series // num_bloques_optimo)
         
         # Calcular proporciones para tiendas y artículos
