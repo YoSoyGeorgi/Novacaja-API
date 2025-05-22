@@ -310,6 +310,34 @@ def run_forecast(input_df: pd.DataFrame, by_store: bool = True, nivel_servicio: 
                         pronostico_30d = demanda_30d
                         stock_seg_7d = z_score * desv_est * np.sqrt(7)
                         stock_seg_30d = z_score * desv_est * np.sqrt(30)
+                        
+                        # Almacenar resultados para modelo simple
+                        result = {
+                            'demanda_pronosticada': {
+                                '7d': int(np.ceil(pronostico_7d)),
+                                '30d': int(np.ceil(pronostico_30d))
+                            },
+                            'stock_seguridad': {
+                                '7d': int(np.ceil(stock_seg_7d)),
+                                '30d': int(np.ceil(stock_seg_30d))
+                            },
+                            'stock_recomendado': {
+                                '7d': int(np.ceil(pronostico_7d + stock_seg_7d)),
+                                '30d': int(np.ceil(pronostico_30d + stock_seg_30d))
+                            },
+                            'intervalos_confianza': {
+                                '95': {
+                                    'inferior': int(np.ceil(max(0, pronostico_7d - z_score * desv_est))),
+                                    'superior': int(np.ceil(pronostico_7d + z_score * desv_est))
+                                }
+                            },
+                            'insights': {
+                                'tendencia': 'estable',
+                                'modelo_usado': 'simple',
+                                'nivel_servicio': nivel_servicio,
+                                'tiempo_procesamiento': time.time() - tiempo_inicio
+                            }
+                        }
                     else:
                         # Realizar downsampling inteligente
                         df = downsampling_series(df)
@@ -362,48 +390,42 @@ def run_forecast(input_df: pd.DataFrame, by_store: bool = True, nivel_servicio: 
                         # Calcular stock de seguridad
                         stock_seg_7d = calcular_stock_seguridad(forecast[forecast['ds'] > last_date].head(7), nivel_servicio, lead_time)
                         stock_seg_30d = calcular_stock_seguridad(forecast[forecast['ds'] > last_date], nivel_servicio, lead_time)
-                    
-                    # Calcular niveles de stock recomendados
-                    stock_rec_7d = max(0, pronostico_7d + stock_seg_7d)
-                    stock_rec_30d = max(0, pronostico_30d + stock_seg_30d)
-                    
-                    # Obtener intervalos de confianza
-                    if dias_datos < 30:
-                        ci_95 = np.array([
-                            [max(0, pronostico_7d - z_score * desv_est), max(0, pronostico_7d + z_score * desv_est)],
-                            [max(0, pronostico_30d - z_score * desv_est), max(0, pronostico_30d + z_score * desv_est)]
-                        ])
-                    else:
+                        
+                        # Calcular niveles de stock recomendados
+                        stock_rec_7d = max(0, pronostico_7d + stock_seg_7d)
+                        stock_rec_30d = max(0, pronostico_30d + stock_seg_30d)
+                        
+                        # Obtener intervalos de confianza
                         ci_95 = forecast[forecast['ds'] > last_date][['yhat_lower', 'yhat_upper']].values
                         ci_95 = np.maximum(0, ci_95)
-                    
-                    # Almacenar resultados
-                    result = {
-                        'demanda_pronosticada': {
-                            '7d': int(np.ceil(pronostico_7d)),
-                            '30d': int(np.ceil(pronostico_30d))
-                        },
-                        'stock_seguridad': {
-                            '7d': int(np.ceil(stock_seg_7d)),
-                            '30d': int(np.ceil(stock_seg_30d))
-                        },
-                        'stock_recomendado': {
-                            '7d': int(np.ceil(stock_rec_7d)),
-                            '30d': int(np.ceil(stock_rec_30d))
-                        },
-                        'intervalos_confianza': {
-                            '95': {
-                                'inferior': int(np.ceil(ci_95[:, 0].mean())),
-                                'superior': int(np.ceil(ci_95[:, 1].mean()))
+                        
+                        # Almacenar resultados para modelo Prophet
+                        result = {
+                            'demanda_pronosticada': {
+                                '7d': int(np.ceil(pronostico_7d)),
+                                '30d': int(np.ceil(pronostico_30d))
+                            },
+                            'stock_seguridad': {
+                                '7d': int(np.ceil(stock_seg_7d)),
+                                '30d': int(np.ceil(stock_seg_30d))
+                            },
+                            'stock_recomendado': {
+                                '7d': int(np.ceil(stock_rec_7d)),
+                                '30d': int(np.ceil(stock_rec_30d))
+                            },
+                            'intervalos_confianza': {
+                                '95': {
+                                    'inferior': int(np.ceil(ci_95[:, 0].mean())),
+                                    'superior': int(np.ceil(ci_95[:, 1].mean()))
+                                }
+                            },
+                            'insights': {
+                                'tendencia': 'creciente' if forecast['trend'].iloc[-1] > forecast['trend'].iloc[0] else 'estable',
+                                'modelo_usado': 'prophet_light' if dias_datos < 180 else 'prophet_full',
+                                'nivel_servicio': nivel_servicio,
+                                'tiempo_procesamiento': time.time() - tiempo_inicio
                             }
-                        },
-                        'insights': {
-                            'tendencia': 'creciente' if dias_datos >= 30 and forecast['trend'].iloc[-1] > forecast['trend'].iloc[0] else 'estable',
-                            'modelo_usado': 'simple' if dias_datos < 30 else 'prophet_light' if dias_datos < 180 else 'prophet_full',
-                            'nivel_servicio': nivel_servicio,
-                            'tiempo_procesamiento': time.time() - tiempo_inicio
                         }
-                    }
                     
                     results[f"{store_id}_{art_codigo}"] = result
                     tiempos_procesamiento[f"{store_id}_{art_codigo}"] = time.time() - tiempo_inicio
