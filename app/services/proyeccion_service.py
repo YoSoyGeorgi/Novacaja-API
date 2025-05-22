@@ -82,6 +82,13 @@ async def calcular_proyeccion(datos_ventas: List[DatoVentaDiaria], by_store: boo
         num_tiendas = df['store_id'].nunique()
         num_articulos = df['art_codigo'].nunique()
 
+        # Validar límite de tiendas
+        if num_tiendas > 2500:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Límite de tiendas excedido, por favor reduzca la cantidad"
+            )
+
         # Calcular tamaño óptimo de bloques
         tiendas_por_bloque, articulos_por_bloque = calcular_tamano_bloque(num_tiendas, num_articulos)
 
