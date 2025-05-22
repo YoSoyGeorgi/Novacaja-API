@@ -498,6 +498,7 @@ def run_forecast(input_df: pd.DataFrame, by_store: bool = True, nivel_servicio: 
                         },
                         'insights': {
                             'tendencia': 'creciente' if forecast['trend'].iloc[-1] > forecast['trend'].iloc[0] else 'estable',
+                            'modelo_usado': 'prophet_full',
                             'estacionalidad_semanal': float(forecast['weekly'].iloc[-1]),
                             'estacionalidad_anual': float(forecast['yearly'].iloc[-1]),
                             'nivel_servicio': nivel_servicio,
