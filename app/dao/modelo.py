@@ -268,7 +268,8 @@ def modelo_simple(df: pd.DataFrame, dias_pronostico: int = 30) -> Tuple[float, f
     return demanda_7d, demanda_30d, desv_est, z_score
 
 def run_forecast(input_df: pd.DataFrame, by_store: bool = True, nivel_servicio: float = 0.95,
-                manejar_atipicos: bool = True, umbral_atipicos: float = 3.0, lead_time: int = 1) -> Tuple[str, str]:
+                manejar_atipicos: bool = True, umbral_atipicos: float = 3.0, lead_time: int = 1,
+                parametros_especiales: Optional[Dict] = None) -> Tuple[str, str]:
     """
     Función optimizada de pronóstico que implementa un modelo híbrido con caché
     """
@@ -317,29 +318,43 @@ def run_forecast(input_df: pd.DataFrame, by_store: bool = True, nivel_servicio: 
                         # Preprocesar datos
                         df = preprocesar_datos(df, manejar_atipicos, umbral_atipicos)
                         
-                        # Configurar modelo según la longitud de la serie
-                        if dias_datos < 180:  # Serie corta
+                        # Configurar modelo según la longitud de la serie y parámetros especiales
+                        if parametros_especiales and parametros_especiales.get('art_codigo') == art_codigo and parametros_especiales.get('store_id') == store_id:
+                            # Usar parámetros especiales
                             model = Prophet(
-                                yearly_seasonality=False,
+                                yearly_seasonality=dias_datos >= 180,
                                 weekly_seasonality=True,
                                 daily_seasonality=False,
-                                changepoint_prior_scale=0.05,
-                                seasonality_prior_scale=0.1,
+                                changepoint_prior_scale=parametros_especiales.get('changepoint_prior_scale', 0.05),
+                                seasonality_prior_scale=parametros_especiales.get('seasonality_prior_scale', 0.1),
                                 seasonality_mode='additive',
                                 uncertainty_samples=UNCERTAINTY_SAMPLES,
-                                changepoint_range=0.8
+                                changepoint_range=parametros_especiales.get('changepoint_range', 0.8)
                             )
-                        else:  # Serie larga
-                            model = Prophet(
-                                yearly_seasonality=True,
-                                weekly_seasonality=True,
-                                daily_seasonality=False,
-                                changepoint_prior_scale=0.001,
-                                seasonality_prior_scale=10.0,
-                                seasonality_mode='additive',
-                                uncertainty_samples=UNCERTAINTY_SAMPLES,
-                                changepoint_range=0.8
-                            )
+                        else:
+                            # Usar configuración por defecto según la longitud de la serie
+                            if dias_datos < 180:  # Serie corta
+                                model = Prophet(
+                                    yearly_seasonality=False,
+                                    weekly_seasonality=True,
+                                    daily_seasonality=False,
+                                    changepoint_prior_scale=0.05,
+                                    seasonality_prior_scale=0.1,
+                                    seasonality_mode='additive',
+                                    uncertainty_samples=UNCERTAINTY_SAMPLES,
+                                    changepoint_range=0.8
+                                )
+                            else:  # Serie larga
+                                model = Prophet(
+                                    yearly_seasonality=True,
+                                    weekly_seasonality=True,
+                                    daily_seasonality=False,
+                                    changepoint_prior_scale=0.001,
+                                    seasonality_prior_scale=10.0,
+                                    seasonality_mode='additive',
+                                    uncertainty_samples=UNCERTAINTY_SAMPLES,
+                                    changepoint_range=0.8
+                                )
                         
                         # Agregar feriados solo para series largas
                         if dias_datos >= 180:
@@ -462,29 +477,43 @@ def run_forecast(input_df: pd.DataFrame, by_store: bool = True, nivel_servicio: 
                         # Preprocesar datos
                         df = preprocesar_datos(df, manejar_atipicos, umbral_atipicos)
                         
-                        # Configurar modelo según la longitud de la serie
-                        if dias_datos < 180:  # Serie corta
+                        # Configurar modelo según la longitud de la serie y parámetros especiales
+                        if parametros_especiales and parametros_especiales.get('art_codigo') == art_codigo:
+                            # Usar parámetros especiales
                             model = Prophet(
-                                yearly_seasonality=False,
+                                yearly_seasonality=dias_datos >= 180,
                                 weekly_seasonality=True,
                                 daily_seasonality=False,
-                                changepoint_prior_scale=0.05,
-                                seasonality_prior_scale=0.1,
+                                changepoint_prior_scale=parametros_especiales.get('changepoint_prior_scale', 0.05),
+                                seasonality_prior_scale=parametros_especiales.get('seasonality_prior_scale', 0.1),
                                 seasonality_mode='additive',
                                 uncertainty_samples=UNCERTAINTY_SAMPLES,
-                                changepoint_range=0.8
+                                changepoint_range=parametros_especiales.get('changepoint_range', 0.8)
                             )
-                        else:  # Serie larga
-                            model = Prophet(
-                                yearly_seasonality=True,
-                                weekly_seasonality=True,
-                                daily_seasonality=False,
-                                changepoint_prior_scale=0.001,
-                                seasonality_prior_scale=10.0,
-                                seasonality_mode='additive',
-                                uncertainty_samples=UNCERTAINTY_SAMPLES,
-                                changepoint_range=0.8
-                            )
+                        else:
+                            # Usar configuración por defecto según la longitud de la serie
+                            if dias_datos < 180:  # Serie corta
+                                model = Prophet(
+                                    yearly_seasonality=False,
+                                    weekly_seasonality=True,
+                                    daily_seasonality=False,
+                                    changepoint_prior_scale=0.05,
+                                    seasonality_prior_scale=0.1,
+                                    seasonality_mode='additive',
+                                    uncertainty_samples=UNCERTAINTY_SAMPLES,
+                                    changepoint_range=0.8
+                                )
+                            else:  # Serie larga
+                                model = Prophet(
+                                    yearly_seasonality=True,
+                                    weekly_seasonality=True,
+                                    daily_seasonality=False,
+                                    changepoint_prior_scale=0.001,
+                                    seasonality_prior_scale=10.0,
+                                    seasonality_mode='additive',
+                                    uncertainty_samples=UNCERTAINTY_SAMPLES,
+                                    changepoint_range=0.8
+                                )
                         
                         # Agregar feriados solo para series largas
                         if dias_datos >= 180:

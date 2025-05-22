@@ -49,7 +49,7 @@ def calcular_tamano_bloque(num_tiendas: int, num_articulos: int) -> tuple:
         tiendas_por_bloque = max(1, num_tiendas // NUM_WORKERS)
         return (tiendas_por_bloque, articulos_por_worker)
 
-async def calcular_proyeccion(datos_ventas: List[DatoVentaDiaria], by_store: bool = True) -> ProyeccionOutput:
+async def calcular_proyeccion(datos_ventas: List[DatoVentaDiaria], by_store: bool = True, parametros_especiales: Optional[List[Dict]] = None) -> ProyeccionOutput:
     """
     Servicio optimizado para calcular la proyección de ventas y stock recomendado
     con procesamiento por bloques dinámicos
@@ -109,11 +109,20 @@ async def calcular_proyeccion(datos_ventas: List[DatoVentaDiaria], by_store: boo
                 for store_id, grupo_tienda in bloque_tiendas:
                     for art_codigo, grupo_producto in grupo_tienda.groupby('art_codigo'):
                         if len(grupo_producto) >= MIN_SERIES_LENGTH:
+                            # Buscar parámetros especiales para este artículo/tienda
+                            parametros = None
+                            if parametros_especiales:
+                                for param in parametros_especiales:
+                                    if param['art_codigo'] == art_codigo and param['store_id'] == store_id:
+                                        parametros = param
+                                        break
+                            
                             articulos_bloque.append({
                                 "store_id": store_id,
                                 "art_codigo": art_codigo,
                                 "ds": grupo_producto['ds'].tolist(),
-                                "y": grupo_producto['y'].tolist()
+                                "y": grupo_producto['y'].tolist(),
+                                "parametros_especiales": parametros
                             })
                 if articulos_bloque:
                     bloques.append(articulos_bloque)
@@ -126,11 +135,20 @@ async def calcular_proyeccion(datos_ventas: List[DatoVentaDiaria], by_store: boo
                 articulos_bloque = []
                 for art_codigo, grupo_articulo in bloque_articulos:
                     if len(grupo_articulo) >= MIN_SERIES_LENGTH:
+                        # Buscar parámetros especiales para este artículo
+                        parametros = None
+                        if parametros_especiales:
+                            for param in parametros_especiales:
+                                if param['art_codigo'] == art_codigo:
+                                    parametros = param
+                                    break
+                        
                         articulos_bloque.append({
                             "store_id": "global",
                             "art_codigo": art_codigo,
                             "ds": grupo_articulo['ds'].tolist(),
-                            "y": grupo_articulo['y'].tolist()
+                            "y": grupo_articulo['y'].tolist(),
+                            "parametros_especiales": parametros
                         })
                 if articulos_bloque:
                     bloques.append(articulos_bloque)

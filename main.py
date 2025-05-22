@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException, Response
-from app.dto.proyeccion_dto import ProyeccionInput, ProyeccionOutput, DatoVentaDiaria
+from app.dto.proyeccion_dto import ProyeccionInput, ProyeccionOutput, DatoVentaDiaria, ProyeccionURLInput
 from app.services.proyeccion_service import calcular_proyeccion
 import os
 from datetime import datetime, timedelta, date
@@ -42,7 +42,7 @@ def health():
     400: {"description": "Error al procesar el archivo JSON o URL inválida"},
     503: {"description": "El servicio está ocupado procesando otra solicitud"}
 })
-async def proyeccion(input_data: ProyeccionInput):
+async def proyeccion(input_data: ProyeccionURLInput):
     # Intentar adquirir el lock
     if not await proyeccion_lock.acquire():
         raise HTTPException(
@@ -51,50 +51,38 @@ async def proyeccion(input_data: ProyeccionInput):
         )
     
     try:
-        # Crear un directorio temporal
-        temp_dir = tempfile.mkdtemp()
-        temp_file_path = os.path.join(temp_dir, "datos_ventas.json")
-        
+        # Descargar el archivo JSON
         try:
-            # Descargar el archivo
-            response = requests.get(input_data.url_archivo)
-            response.raise_for_status()  # Lanza una excepción si hay error HTTP
+            response = requests.get(str(input_data.url))
+            response.raise_for_status()  # Lanzar excepción si hay error HTTP
+            input_json = response.json()
+        except requests.RequestException as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Error al descargar el archivo JSON: {str(e)}"
+            )
+        except json.JSONDecodeError:
+            raise HTTPException(
+                status_code=400,
+                detail="El archivo descargado no es un JSON válido"
+            )
+        
+        # Validar la estructura del JSON
+        try:
+            input_data = ProyeccionInput(**input_json)
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"El JSON no tiene la estructura correcta: {str(e)}"
+            )
+        
+        # Procesar la proyección
+        return await calcular_proyeccion(
+            datos_ventas=input_data.datos_ventas,
+            by_store=input_data.by_store,
+            parametros_especiales=input_data.parametros_especiales
+        )
             
-            # Guardar el archivo temporalmente
-            with open(temp_file_path, 'wb') as f:
-                f.write(response.content)
-            
-            # Leer y validar el JSON
-            with open(temp_file_path, 'r', encoding='utf-8') as f:
-                json_data = json.load(f)
-            
-            # Validar la estructura del JSON
-            if not isinstance(json_data, dict):
-                raise HTTPException(status_code=400, detail="El archivo JSON debe ser un objeto")
-            
-            if 'datos_ventas' not in json_data:
-                raise HTTPException(status_code=400, detail="El archivo JSON debe contener una clave 'datos_ventas'")
-            
-            if 'by_store' not in json_data:
-                raise HTTPException(status_code=400, detail="El archivo JSON debe contener una clave 'by_store'")
-            
-            if not isinstance(json_data['by_store'], bool):
-                raise HTTPException(status_code=400, detail="El valor de 'by_store' debe ser un booleano")
-            
-            # Convertir los datos a DatoVentaDiaria
-            datos_ventas = [DatoVentaDiaria(**venta) for venta in json_data['datos_ventas']]
-            
-            # Procesar la proyección usando by_store del JSON
-            return await calcular_proyeccion(datos_ventas, json_data['by_store'])
-            
-        finally:
-            # Limpiar: eliminar el directorio temporal y su contenido
-            shutil.rmtree(temp_dir)
-            
-    except requests.RequestException as e:
-        raise HTTPException(status_code=400, detail=f"Error al descargar el archivo: {str(e)}")
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="El archivo no contiene un JSON válido")
     except HTTPException as he:
         # Preservar el error HTTP original
         raise he

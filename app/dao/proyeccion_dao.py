@@ -2,7 +2,7 @@ import pandas as pd
 import json
 from app.dao.modelo import run_forecast
 from datetime import date, timedelta
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import numpy as np
 import asyncio
 from concurrent.futures import ProcessPoolExecutor
@@ -114,7 +114,7 @@ class ProyeccionDAO:
         return resultados
     
     @staticmethod
-    def _procesar_serie(df: pd.DataFrame, store_id: str, art_codigo: str, by_store: bool) -> Dict[str, Any]:
+    def _procesar_serie(df: pd.DataFrame, store_id: str, art_codigo: str, by_store: bool, parametros_especiales: Optional[Dict] = None) -> Dict[str, Any]:
         """
         Procesa una serie temporal individual
         
@@ -128,6 +128,8 @@ class ProyeccionDAO:
             Código del artículo
         by_store : bool
             Indica si el pronóstico debe realizarse por tienda
+        parametros_especiales : Dict, opcional
+            Parámetros especiales para el modelo Prophet
             
         Retorna:
         --------
@@ -146,14 +148,15 @@ class ProyeccionDAO:
                 'y': df['y']
             })
             
-            # Ejecutar pronóstico con valores predeterminados
+            # Ejecutar pronóstico con valores predeterminados o especiales
             json_results, _ = run_forecast(
                 input_df=df_forecast,
                 by_store=by_store,
                 nivel_servicio=0.95,
                 manejar_atipicos=True,
                 umbral_atipicos=3.0,
-                lead_time=1
+                lead_time=1,
+                parametros_especiales=parametros_especiales
             )
             
             # Convertir resultados JSON a diccionario Python
