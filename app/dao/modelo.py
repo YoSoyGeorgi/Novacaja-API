@@ -416,8 +416,15 @@ def run_forecast(input_df: pd.DataFrame, by_store: bool = True, nivel_servicio: 
             # Primero agrupar y sumar todas las ventas por fecha para cada artículo
             df_agrupado = input_df.groupby(['art_codigo', 'ds'])['y'].sum().reset_index()
             
+            # Crear un conjunto para rastrear artículos procesados
+            articulos_procesados = set()
+            
             # Luego procesar cada artículo
             for art_codigo, group_data in df_agrupado.groupby('art_codigo'):
+                # Verificar si ya procesamos este artículo
+                if art_codigo in articulos_procesados:
+                    continue
+                    
                 try:
                     tiempo_inicio = time.time()
                     
@@ -435,6 +442,7 @@ def run_forecast(input_df: pd.DataFrame, by_store: bool = True, nivel_servicio: 
                     
                     if cached_result is not None:
                         results[art_codigo] = cached_result
+                        articulos_procesados.add(art_codigo)
                         continue
                     
                     # Determinar el tipo de modelo a usar
@@ -544,6 +552,7 @@ def run_forecast(input_df: pd.DataFrame, by_store: bool = True, nivel_servicio: 
                     
                     results[art_codigo] = result
                     tiempos_procesamiento[art_codigo] = time.time() - tiempo_inicio
+                    articulos_procesados.add(art_codigo)
                     
                 except Exception as e:
                     logger.error(f"Error procesando artículo {art_codigo}: {str(e)}")
