@@ -1,5 +1,5 @@
-# Usa Python 3.11 para que haya wheels disponibles
-FROM python:3.11-slim
+# Usa Python 3.9 para mejor compatibilidad con pystan 2.19.1.1
+FROM python:3.9-slim
 
 # Directorio de trabajo
 WORKDIR /app
@@ -21,6 +21,9 @@ RUN apt-get update \
 
 # 2. Actualiza pip y empaquetadores
 RUN pip install --upgrade pip setuptools wheel
+
+# Instala dependencias de compilación para pystan
+RUN pip install --no-cache-dir Cython==0.29.24 numpy==1.21.6
 
 # Instala pystan primero por separado para asegurar compilación correcta
 RUN pip install --no-cache-dir pystan==2.19.1.1
