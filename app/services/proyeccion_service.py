@@ -15,7 +15,6 @@ from itertools import groupby
 from operator import itemgetter
 from collections import defaultdict
 import time
-from app.dao.modelo import run_forecast
 import json
 
 # Configurar logger
