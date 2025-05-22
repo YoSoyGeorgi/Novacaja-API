@@ -5,6 +5,7 @@ FROM python:3.11-slim
 WORKDIR /app
 
 ENV PROPHET_BACKEND PYSTAN
+ENV TMPDIR /tmp
 
 # Copia solo requirements y actualiza pip antes de instalar
 COPY requirements.txt .
@@ -15,11 +16,14 @@ COPY /app/README.md /app/README.md
 
 # 1. Instala build-tools (si lo necesitas)
 RUN apt-get update \
- && apt-get install -y build-essential libatlas-base-dev gfortran \
+ && apt-get install -y build-essential libatlas-base-dev gfortran gcc g++ python3-dev \
  && rm -rf /var/lib/apt/lists/*
 
 # 2. Actualiza pip y empaquetadores
 RUN pip install --upgrade pip setuptools wheel
+
+# Instala pystan primero por separado para asegurar compilación correcta
+RUN pip install --no-cache-dir pystan==2.19.1.1
 
 # Instala las dependencias de Python (si tienes un archivo requirements.txt)
 COPY ./requirements.txt /app/requirements.txt
