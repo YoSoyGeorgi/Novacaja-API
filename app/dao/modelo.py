@@ -10,6 +10,8 @@ import logging
 from functools import lru_cache
 import time
 
+# Configure logging to suppress cmdstanpy logs
+logging.getLogger('cmdstanpy').setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 # Constantes para optimización
