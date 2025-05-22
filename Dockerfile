@@ -1,5 +1,5 @@
-# Usa Python 3.9 para mejor compatibilidad con pystan 2.19.1.1
-FROM python:3.9-slim
+# Usa Python 3.8 para mejor compatibilidad con pystan 2.19.1.1
+FROM python:3.8-slim
 
 # Directorio de trabajo
 WORKDIR /app
