@@ -9,11 +9,14 @@ from typing import Tuple, Dict, Any, Optional
 import logging
 from functools import lru_cache
 import time
+import warnings
 
-# Configure logging to suppress all cmdstanpy and Stan logs
-logging.getLogger('cmdstanpy').setLevel(logging.ERROR)
-logging.getLogger('prophet').setLevel(logging.ERROR)
-logging.getLogger('stan').setLevel(logging.ERROR)
+# Completely disable all cmdstanpy and related logs
+logging.getLogger('cmdstanpy').disabled = True
+logging.getLogger('prophet').disabled = True
+logging.getLogger('stan').disabled = True
+warnings.filterwarnings('ignore')
+
 logger = logging.getLogger(__name__)
 
 # Constantes para optimización

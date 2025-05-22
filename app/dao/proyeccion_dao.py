@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 # Constantes para optimización
 MAX_WORKERS = len(psutil.cpu_freq(percpu=True))  # Usar núcleos físicos disponibles
 print(MAX_WORKERS)
-BATCH_SIZE = 100  # Tamaño de lote reducido para mejor distribución
+# BATCH_SIZE se calculará dinámicamente en lugar de ser fijo
 
 class ProyeccionDAO:
     @staticmethod
@@ -44,8 +44,37 @@ class ProyeccionDAO:
             if not datos_ventas:
                 raise ValueError("Datos de ventas no proporcionados")
             
-            # Dividir los datos en lotes más grandes para procesamiento en paralelo
-            batches = [datos_ventas[i:i + BATCH_SIZE] for i in range(0, len(datos_ventas), BATCH_SIZE)]
+            # Calcular tamaño de lote dinámico basado en el número de workers y datos
+            total_series = len(datos_ventas)
+            
+            # Estrategia adaptativa basada en el número de series
+            if total_series <= MAX_WORKERS:
+                # Si tenemos menos series que workers, una serie por batch
+                batch_size = 1
+                logger.info(f"Pocas series ({total_series}), usando batch_size=1")
+            elif total_series <= MAX_WORKERS * 10:
+                # Para cantidades moderadas, crear exactamente MAX_WORKERS batches
+                batch_size = max(1, total_series // MAX_WORKERS)
+                logger.info(f"Series moderadas ({total_series}), usando {MAX_WORKERS} batches")
+            else:
+                # Para muchas series, usar 2-3 batches por worker para mejor distribución
+                # Esto ayuda a mantener todos los CPUs ocupados si algunos terminan antes
+                num_batches = MAX_WORKERS * 2
+                batch_size = max(1, total_series // num_batches)
+                
+                # Limitar el tamaño máximo del batch para evitar problemas de memoria
+                # Con 32 CPUs y máximo 2500 series, esto daría ~39 series por batch
+                max_batch_size = min(100, max(50, 2500 // (MAX_WORKERS * 2)))
+                batch_size = min(batch_size, max_batch_size)
+                logger.info(f"Muchas series ({total_series}), usando batch_size={batch_size}")
+            
+            # Log final para debugging
+            num_batches_final = (total_series + batch_size - 1) // batch_size
+            logger.info(f"Procesando {total_series} series con {MAX_WORKERS} workers, "
+                       f"batch_size={batch_size}, total_batches={num_batches_final}")
+            
+            # Dividir los datos en lotes optimizados para procesamiento en paralelo
+            batches = [datos_ventas[i:i + batch_size] for i in range(0, len(datos_ventas), batch_size)]
             
             # Crear un pool de procesos para procesamiento paralelo
             with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
@@ -272,8 +301,34 @@ class ProyeccionDAO:
             if not datos_ventas:
                 raise ValueError("Datos de ventas no proporcionados")
             
+            # Calcular tamaño de lote dinámico basado en el número de workers y datos
+            total_series = len(datos_ventas)
+            
+            # Estrategia adaptativa basada en el número de series
+            if total_series <= MAX_WORKERS:
+                # Si tenemos menos series que workers, una serie por batch
+                batch_size = 1
+            elif total_series <= MAX_WORKERS * 10:
+                # Para cantidades moderadas, crear exactamente MAX_WORKERS batches
+                batch_size = max(1, total_series // MAX_WORKERS)
+            else:
+                # Para muchas series, usar 2-3 batches por worker para mejor distribución
+                # Esto ayuda a mantener todos los CPUs ocupados si algunos terminan antes
+                num_batches = MAX_WORKERS * 2
+                batch_size = max(1, total_series // num_batches)
+                
+                # Limitar el tamaño máximo del batch para evitar problemas de memoria
+                # Con 32 CPUs y máximo 2500 series, esto daría ~39 series por batch
+                max_batch_size = min(100, max(50, 2500 // (MAX_WORKERS * 2)))
+                batch_size = min(batch_size, max_batch_size)
+            
+            # Log final para debugging
+            num_batches_final = (total_series + batch_size - 1) // batch_size
+            logger.info(f"Procesando {total_series} series con {MAX_WORKERS} workers, "
+                       f"batch_size={batch_size}, total_batches={num_batches_final}")
+            
             # Dividir los datos en lotes
-            batches = [datos_ventas[i:i + BATCH_SIZE] for i in range(0, len(datos_ventas), BATCH_SIZE)]
+            batches = [datos_ventas[i:i + batch_size] for i in range(0, len(datos_ventas), batch_size)]
             resultados_validos = []
             
             for batch in batches:
