@@ -329,7 +329,8 @@ def run_forecast(input_df: pd.DataFrame, by_store: bool = True, nivel_servicio: 
                                 seasonality_prior_scale=parametros_especiales.get('seasonality_prior_scale', 0.1),
                                 seasonality_mode='additive',
                                 uncertainty_samples=UNCERTAINTY_SAMPLES,
-                                changepoint_range=parametros_especiales.get('changepoint_range', 0.8)
+                                changepoint_range=parametros_especiales.get('changepoint_range', 0.8),
+                                stan_backend_options={'algorithm': 'newton'}
                             )
                         else:
                             # Usar configuración por defecto según la longitud de la serie
@@ -342,7 +343,8 @@ def run_forecast(input_df: pd.DataFrame, by_store: bool = True, nivel_servicio: 
                                     seasonality_prior_scale=0.1,
                                     seasonality_mode='additive',
                                     uncertainty_samples=UNCERTAINTY_SAMPLES,
-                                    changepoint_range=0.8
+                                    changepoint_range=0.8,
+                                    stan_backend_options={'algorithm': 'newton'}
                                 )
                             else:  # Serie larga
                                 model = Prophet(
@@ -353,7 +355,8 @@ def run_forecast(input_df: pd.DataFrame, by_store: bool = True, nivel_servicio: 
                                     seasonality_prior_scale=10.0,
                                     seasonality_mode='additive',
                                     uncertainty_samples=UNCERTAINTY_SAMPLES,
-                                    changepoint_range=0.8
+                                    changepoint_range=0.8,
+                                    stan_backend_options={'algorithm': 'newton'}
                                 )
                         
                         # Agregar feriados solo para series largas
@@ -488,7 +491,8 @@ def run_forecast(input_df: pd.DataFrame, by_store: bool = True, nivel_servicio: 
                                 seasonality_prior_scale=parametros_especiales.get('seasonality_prior_scale', 0.1),
                                 seasonality_mode='additive',
                                 uncertainty_samples=UNCERTAINTY_SAMPLES,
-                                changepoint_range=parametros_especiales.get('changepoint_range', 0.8)
+                                changepoint_range=parametros_especiales.get('changepoint_range', 0.8),
+                                stan_backend_options={'algorithm': 'newton'}
                             )
                         else:
                             # Usar configuración por defecto según la longitud de la serie
@@ -501,7 +505,8 @@ def run_forecast(input_df: pd.DataFrame, by_store: bool = True, nivel_servicio: 
                                     seasonality_prior_scale=0.1,
                                     seasonality_mode='additive',
                                     uncertainty_samples=UNCERTAINTY_SAMPLES,
-                                    changepoint_range=0.8
+                                    changepoint_range=0.8,
+                                    stan_backend_options={'algorithm': 'newton'}
                                 )
                             else:  # Serie larga
                                 model = Prophet(
@@ -512,7 +517,8 @@ def run_forecast(input_df: pd.DataFrame, by_store: bool = True, nivel_servicio: 
                                     seasonality_prior_scale=10.0,
                                     seasonality_mode='additive',
                                     uncertainty_samples=UNCERTAINTY_SAMPLES,
-                                    changepoint_range=0.8
+                                    changepoint_range=0.8,
+                                    stan_backend_options={'algorithm': 'newton'}
                                 )
                         
                         # Agregar feriados solo para series largas
