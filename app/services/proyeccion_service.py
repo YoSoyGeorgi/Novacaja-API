@@ -78,6 +78,11 @@ async def calcular_proyeccion(datos_ventas: List[DatoVentaDiaria], by_store: boo
             'y': np.array([d.y for d in datos_ventas], dtype=np.float64)
         })
 
+        # Si by_store es False, agrupar por artículo y fecha, sumando las ventas
+        if not by_store:
+            df = df.groupby(['art_codigo', 'ds'])['y'].sum().reset_index()
+            df['store_id'] = 'global'  # Asignar store_id global
+
         # Obtener número único de tiendas y artículos
         num_tiendas = df['store_id'].nunique()
         num_articulos = df['art_codigo'].nunique()
@@ -119,18 +124,17 @@ async def calcular_proyeccion(datos_ventas: List[DatoVentaDiaria], by_store: boo
             # Dividir artículos en bloques más pequeños
             for i in range(0, len(articulos_grupos), articulos_por_bloque):
                 bloque_articulos = articulos_grupos[i:i + articulos_por_bloque]
-                tiendas_bloque = []
+                articulos_bloque = []
                 for art_codigo, grupo_articulo in bloque_articulos:
-                    for store_id, grupo_tienda in grupo_articulo.groupby('store_id'):
-                        if len(grupo_tienda) >= MIN_SERIES_LENGTH:
-                            tiendas_bloque.append({
-                                "store_id": store_id,
-                                "art_codigo": art_codigo,
-                                "ds": grupo_tienda['ds'].tolist(),
-                                "y": grupo_tienda['y'].tolist()
-                            })
-                if tiendas_bloque:
-                    bloques.append(tiendas_bloque)
+                    if len(grupo_articulo) >= MIN_SERIES_LENGTH:
+                        articulos_bloque.append({
+                            "store_id": "global",
+                            "art_codigo": art_codigo,
+                            "ds": grupo_articulo['ds'].tolist(),
+                            "y": grupo_articulo['y'].tolist()
+                        })
+                if articulos_bloque:
+                    bloques.append(articulos_bloque)
 
         # Asegurar que tengamos suficientes bloques para los workers
         if len(bloques) < NUM_WORKERS:
