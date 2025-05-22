@@ -10,8 +10,10 @@ import logging
 from functools import lru_cache
 import time
 
-# Configure logging to suppress cmdstanpy logs
-logging.getLogger('cmdstanpy').setLevel(logging.WARNING)
+# Configure logging to suppress all cmdstanpy and Stan logs
+logging.getLogger('cmdstanpy').setLevel(logging.ERROR)
+logging.getLogger('prophet').setLevel(logging.ERROR)
+logging.getLogger('stan').setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
 
 # Constantes para optimización
@@ -596,10 +598,7 @@ def run_forecast(input_df: pd.DataFrame, by_store: bool = True, nivel_servicio: 
         logger.error(f"Error en run_forecast: {str(e)}")
         raise
     
-    # Generar reporte con tiempos de procesamiento
-    report_text = generar_reporte(results, by_store, nivel_servicio, tiempos_procesamiento)
-    
-    return json.dumps(results, indent=2), report_text
+    return json.dumps(results, indent=2)
 
 def generar_reporte(results: Dict, by_store: bool, nivel_servicio: float, tiempos_procesamiento: Dict) -> str:
     """Genera el reporte de resultados con información de rendimiento"""
@@ -693,7 +692,7 @@ if __name__ == "__main__":
     sample_df = pd.DataFrame(sample_data)
     
     # Ejecutar pronóstico con 95% de nivel de servicio y manejo de atípicos
-    json_results, report = run_forecast(
+    json_results = run_forecast(
         sample_df, 
         by_store=False, 
         nivel_servicio=0.95,
@@ -703,6 +702,4 @@ if __name__ == "__main__":
     )
     
     print("Resultados JSON:")
-    print(json_results)
-    print("\nReporte:")
-    print(report) 
+    print(json_results) 
