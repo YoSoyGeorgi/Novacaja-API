@@ -69,6 +69,10 @@ async def calcular_proyeccion(datos_ventas: List[DatoVentaDiaria], by_store: boo
                 detail="No se proporcionaron datos de ventas"
             )
 
+        # Convertir parámetros especiales a diccionario si es necesario
+        if parametros_especiales:
+            parametros_especiales = [param.dict() if hasattr(param, 'dict') else param for param in parametros_especiales]
+
         # Convertir datos a DataFrame
         df = pd.DataFrame({
             'store_id': np.array([d.store_id for d in datos_ventas]),

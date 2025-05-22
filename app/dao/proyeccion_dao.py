@@ -148,6 +148,10 @@ class ProyeccionDAO:
                 'y': df['y']
             })
             
+            # Convertir parámetros especiales a diccionario si es necesario
+            if parametros_especiales and hasattr(parametros_especiales, 'dict'):
+                parametros_especiales = parametros_especiales.dict()
+            
             # Ejecutar pronóstico con valores predeterminados o especiales
             json_results, _ = run_forecast(
                 input_df=df_forecast,

@@ -278,46 +278,46 @@ def run_forecast(input_df: pd.DataFrame, by_store: bool = True, nivel_servicio: 
     tiempos_procesamiento = {}
     
     try:
-        # Agrupar datos según el parámetro by_store
+    # Agrupar datos según el parámetro by_store
         if by_store:
             # Procesar por tienda-artículo
             for (store_id, art_codigo), group_data in input_df.groupby(['store_id', 'art_codigo']):
-                try:
-                    tiempo_inicio = time.time()
-                    
-                    # Preparar datos
+        try:
+            tiempo_inicio = time.time()
+            
+            # Preparar datos
                     df = preparar_datos_para_clave(group_data, (store_id, art_codigo))
                     
                     # Verificar si hay suficientes datos
                     if len(df) < 2:
                         logger.warning(f"Datos insuficientes para la serie {store_id}-{art_codigo}")
                         continue
-                    
-                    # Verificar caché
-                    data_hash = hash(str(df[['ds', 'y']].values.tobytes()))
-                    cached_result = get_cached_forecast(art_codigo, store_id, str(data_hash))
-                    
-                    if cached_result is not None:
+            
+            # Verificar caché
+            data_hash = hash(str(df[['ds', 'y']].values.tobytes()))
+            cached_result = get_cached_forecast(art_codigo, store_id, str(data_hash))
+            
+            if cached_result is not None:
                         results[f"{store_id}_{art_codigo}"] = cached_result
-                        continue
-                    
-                    # Determinar el tipo de modelo a usar
-                    dias_datos = (df['ds'].max() - df['ds'].min()).days
-                    
-                    if dias_datos < 30:  # Serie muy corta
-                        # Usar modelo simple
-                        demanda_7d, demanda_30d, desv_est, z_score = modelo_simple(df)
+                continue
+            
+            # Determinar el tipo de modelo a usar
+            dias_datos = (df['ds'].max() - df['ds'].min()).days
+            
+            if dias_datos < 30:  # Serie muy corta
+                # Usar modelo simple
+                demanda_7d, demanda_30d, desv_est, z_score = modelo_simple(df)
                         pronostico_7d = demanda_7d
                         pronostico_30d = demanda_30d
-                        stock_seg_7d = z_score * desv_est * np.sqrt(7)
-                        stock_seg_30d = z_score * desv_est * np.sqrt(30)
-                    else:
-                        # Realizar downsampling inteligente
-                        df = downsampling_series(df)
-                        
-                        # Preprocesar datos
-                        df = preprocesar_datos(df, manejar_atipicos, umbral_atipicos)
-                        
+                stock_seg_7d = z_score * desv_est * np.sqrt(7)
+                stock_seg_30d = z_score * desv_est * np.sqrt(30)
+            else:
+                # Realizar downsampling inteligente
+                df = downsampling_series(df)
+                
+                # Preprocesar datos
+                df = preprocesar_datos(df, manejar_atipicos, umbral_atipicos)
+                
                         # Configurar modelo según la longitud de la serie y parámetros especiales
                         if parametros_especiales and parametros_especiales.get('art_codigo') == art_codigo and parametros_especiales.get('store_id') == store_id:
                             # Usar parámetros especiales
@@ -333,93 +333,93 @@ def run_forecast(input_df: pd.DataFrame, by_store: bool = True, nivel_servicio: 
                             )
                         else:
                             # Usar configuración por defecto según la longitud de la serie
-                            if dias_datos < 180:  # Serie corta
-                                model = Prophet(
-                                    yearly_seasonality=False,
-                                    weekly_seasonality=True,
-                                    daily_seasonality=False,
+                if dias_datos < 180:  # Serie corta
+                    model = Prophet(
+                        yearly_seasonality=False,
+                        weekly_seasonality=True,
+                        daily_seasonality=False,
                                     changepoint_prior_scale=0.05,
                                     seasonality_prior_scale=0.1,
-                                    seasonality_mode='additive',
-                                    uncertainty_samples=UNCERTAINTY_SAMPLES,
+                        seasonality_mode='additive',
+                        uncertainty_samples=UNCERTAINTY_SAMPLES,
                                     changepoint_range=0.8
-                                )
-                            else:  # Serie larga
-                                model = Prophet(
-                                    yearly_seasonality=True,
-                                    weekly_seasonality=True,
-                                    daily_seasonality=False,
-                                    changepoint_prior_scale=0.001,
-                                    seasonality_prior_scale=10.0,
-                                    seasonality_mode='additive',
-                                    uncertainty_samples=UNCERTAINTY_SAMPLES,
-                                    changepoint_range=0.8
-                                )
-                        
-                        # Agregar feriados solo para series largas
-                        if dias_datos >= 180:
-                            model.add_country_holidays(country_name='MX')
-                        
-                        # Ajustar modelo
-                        model.fit(df)
-                        
-                        # Generar pronóstico
-                        future_dates = model.make_future_dataframe(periods=30)
-                        forecast = model.predict(future_dates)
-                        
-                        # Obtener última fecha en datos de entrenamiento
-                        last_date = df['ds'].max()
-                        
-                        # Calcular métricas
-                        pronostico_7d = max(0, forecast[forecast['ds'] > last_date].head(7)['yhat'].sum())
-                        pronostico_30d = max(0, forecast[forecast['ds'] > last_date]['yhat'].sum())
-                        
-                        # Calcular stock de seguridad
-                        stock_seg_7d = calcular_stock_seguridad(forecast[forecast['ds'] > last_date].head(7), nivel_servicio, lead_time)
-                        stock_seg_30d = calcular_stock_seguridad(forecast[forecast['ds'] > last_date], nivel_servicio, lead_time)
-                    
-                    # Calcular niveles de stock recomendados
-                    stock_rec_7d = max(0, pronostico_7d + stock_seg_7d)
-                    stock_rec_30d = max(0, pronostico_30d + stock_seg_30d)
-                    
-                    # Obtener intervalos de confianza
-                    if dias_datos < 30:
-                        ci_95 = np.array([
-                            [max(0, pronostico_7d - z_score * desv_est), max(0, pronostico_7d + z_score * desv_est)],
-                            [max(0, pronostico_30d - z_score * desv_est), max(0, pronostico_30d + z_score * desv_est)]
-                        ])
-                    else:
-                        ci_95 = forecast[forecast['ds'] > last_date][['yhat_lower', 'yhat_upper']].values
-                        ci_95 = np.maximum(0, ci_95)
-                    
-                    # Almacenar resultados
-                    result = {
-                        'demanda_pronosticada': {
-                            '7d': int(np.ceil(pronostico_7d)),
-                            '30d': int(np.ceil(pronostico_30d))
-                        },
-                        'stock_seguridad': {
-                            '7d': int(np.ceil(stock_seg_7d)),
-                            '30d': int(np.ceil(stock_seg_30d))
-                        },
-                        'stock_recomendado': {
-                            '7d': int(np.ceil(stock_rec_7d)),
-                            '30d': int(np.ceil(stock_rec_30d))
-                        },
-                        'intervalos_confianza': {
-                            '95': {
-                                'inferior': int(np.ceil(ci_95[:, 0].mean())),
-                                'superior': int(np.ceil(ci_95[:, 1].mean()))
-                            }
-                        },
-                        'insights': {
-                            'tendencia': 'creciente' if dias_datos >= 30 and forecast['trend'].iloc[-1] > forecast['trend'].iloc[0] else 'estable',
-                            'modelo_usado': 'simple' if dias_datos < 30 else 'prophet_light' if dias_datos < 180 else 'prophet_full',
-                            'nivel_servicio': nivel_servicio,
-                            'tiempo_procesamiento': time.time() - tiempo_inicio
-                        }
+                    )
+                else:  # Serie larga
+                    model = Prophet(
+                        yearly_seasonality=True,
+                        weekly_seasonality=True,
+                        daily_seasonality=False,
+                        changepoint_prior_scale=0.001,
+                        seasonality_prior_scale=10.0,
+                        seasonality_mode='additive',
+                        uncertainty_samples=UNCERTAINTY_SAMPLES,
+                        changepoint_range=0.8
+                    )
+                
+                # Agregar feriados solo para series largas
+                if dias_datos >= 180:
+                    model.add_country_holidays(country_name='MX')
+                
+                # Ajustar modelo
+                model.fit(df)
+                
+                # Generar pronóstico
+                future_dates = model.make_future_dataframe(periods=30)
+                forecast = model.predict(future_dates)
+                
+                # Obtener última fecha en datos de entrenamiento
+                last_date = df['ds'].max()
+                
+                # Calcular métricas
+                pronostico_7d = max(0, forecast[forecast['ds'] > last_date].head(7)['yhat'].sum())
+                pronostico_30d = max(0, forecast[forecast['ds'] > last_date]['yhat'].sum())
+                
+                # Calcular stock de seguridad
+                stock_seg_7d = calcular_stock_seguridad(forecast[forecast['ds'] > last_date].head(7), nivel_servicio, lead_time)
+                stock_seg_30d = calcular_stock_seguridad(forecast[forecast['ds'] > last_date], nivel_servicio, lead_time)
+            
+            # Calcular niveles de stock recomendados
+            stock_rec_7d = max(0, pronostico_7d + stock_seg_7d)
+            stock_rec_30d = max(0, pronostico_30d + stock_seg_30d)
+            
+            # Obtener intervalos de confianza
+            if dias_datos < 30:
+                ci_95 = np.array([
+                    [max(0, pronostico_7d - z_score * desv_est), max(0, pronostico_7d + z_score * desv_est)],
+                    [max(0, pronostico_30d - z_score * desv_est), max(0, pronostico_30d + z_score * desv_est)]
+                ])
+            else:
+                ci_95 = forecast[forecast['ds'] > last_date][['yhat_lower', 'yhat_upper']].values
+                ci_95 = np.maximum(0, ci_95)
+            
+            # Almacenar resultados
+            result = {
+                'demanda_pronosticada': {
+                    '7d': int(np.ceil(pronostico_7d)),
+                    '30d': int(np.ceil(pronostico_30d))
+                },
+                'stock_seguridad': {
+                    '7d': int(np.ceil(stock_seg_7d)),
+                    '30d': int(np.ceil(stock_seg_30d))
+                },
+                'stock_recomendado': {
+                    '7d': int(np.ceil(stock_rec_7d)),
+                    '30d': int(np.ceil(stock_rec_30d))
+                },
+                'intervalos_confianza': {
+                    '95': {
+                        'inferior': int(np.ceil(ci_95[:, 0].mean())),
+                        'superior': int(np.ceil(ci_95[:, 1].mean()))
                     }
-                    
+                },
+                'insights': {
+                    'tendencia': 'creciente' if dias_datos >= 30 and forecast['trend'].iloc[-1] > forecast['trend'].iloc[0] else 'estable',
+                    'modelo_usado': 'simple' if dias_datos < 30 else 'prophet_light' if dias_datos < 180 else 'prophet_full',
+                    'nivel_servicio': nivel_servicio,
+                    'tiempo_procesamiento': time.time() - tiempo_inicio
+                }
+            }
+            
                     results[f"{store_id}_{art_codigo}"] = result
                     tiempos_procesamiento[f"{store_id}_{art_codigo}"] = time.time() - tiempo_inicio
                     
@@ -582,18 +582,18 @@ def run_forecast(input_df: pd.DataFrame, by_store: bool = True, nivel_servicio: 
                     results[art_codigo] = result
                     tiempos_procesamiento[art_codigo] = time.time() - tiempo_inicio
                     articulos_procesados.add(art_codigo)
-                    
-                except Exception as e:
+            
+        except Exception as e:
                     logger.error(f"Error procesando artículo {art_codigo}: {str(e)}")
-                    continue
-        
+            continue
+    
         if not results:
             raise ValueError("No se pudo procesar ninguna serie temporal")
         
-        # Generar reporte con tiempos de procesamiento
-        report_text = generar_reporte(results, by_store, nivel_servicio, tiempos_procesamiento)
-        
-        return json.dumps(results, indent=2), report_text
+    # Generar reporte con tiempos de procesamiento
+    report_text = generar_reporte(results, by_store, nivel_servicio, tiempos_procesamiento)
+    
+    return json.dumps(results, indent=2), report_text
         
     except Exception as e:
         logger.error(f"Error en run_forecast: {str(e)}")
