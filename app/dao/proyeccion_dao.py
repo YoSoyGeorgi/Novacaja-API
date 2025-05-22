@@ -271,14 +271,18 @@ class ProyeccionDAO:
         try:
             if not datos_ventas:
                 raise ValueError("Datos de ventas no proporcionados")
+            
             # Dividir los datos en lotes
             batches = [datos_ventas[i:i + BATCH_SIZE] for i in range(0, len(datos_ventas), BATCH_SIZE)]
             resultados_validos = []
+            
             for batch in batches:
                 batch_result = ProyeccionDAO._procesar_lote(batch=batch, by_store=by_store)
                 if batch_result:
                     resultados_validos.extend(batch_result)
+            
             return resultados_validos
+            
         except Exception as e:
             logger.error(f"Error al obtener la proyección (sync): {str(e)}")
             raise Exception(f"Error al obtener la proyección (sync): {str(e)}") 
