@@ -9,17 +9,11 @@ from typing import Tuple, Dict, Any, Optional
 import logging
 from functools import lru_cache
 import time
-import os
-
-# Configurar directorio temporal para Stan si no está configurado
-if 'TMPDIR' not in os.environ:
-    os.environ['TMPDIR'] = '/tmp/prophet_stan'
-    os.makedirs(os.environ['TMPDIR'], exist_ok=True)
 
 logger = logging.getLogger(__name__)
 
 # Constantes para optimización
-UNCERTAINTY_SAMPLES = 30  # Reducido para mejor rendimiento
+UNCERTAINTY_SAMPLES = 10  # Reducido para mejor rendimiento
 MIN_POINTS_FOR_SEASONALITY = 90  # Mínimo de puntos para considerar estacionalidad
 CACHE_SIZE = 1000  # Tamaño del caché para resultados frecuentes
 

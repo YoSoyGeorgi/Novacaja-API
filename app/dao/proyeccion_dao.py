@@ -15,7 +15,7 @@ import psutil
 logger = logging.getLogger(__name__)
 
 # Constantes para optimización
-MAX_WORKERS = min(4, len(psutil.cpu_freq(percpu=True)))  # Máximo 4 workers para evitar problemas con Stan
+MAX_WORKERS = len(psutil.cpu_freq(percpu=True))  # Usar núcleos físicos disponibles
 print(MAX_WORKERS)
 BATCH_SIZE = 100  # Tamaño de lote reducido para mejor distribución
 
