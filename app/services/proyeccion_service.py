@@ -25,26 +25,30 @@ logger = logging.getLogger(__name__)
 MAX_MEMORY_PERCENT = 90  # Porcentaje máximo de memoria a utilizar
 MIN_MEMORY_REQUIRED_MB = 1024  # Memoria mínima requerida en MB
 NUM_WORKERS = len(psutil.cpu_freq(percpu=True))  # Número de workers (uno por núcleo físico)
+print(NUM_WORKERS)
 MIN_SERIES_LENGTH = 2
 
 def calcular_tamano_bloque(num_tiendas: int, num_articulos: int) -> tuple:
     """
     Calcula el tamaño óptimo de los bloques basado en la relación tiendas/artículos
+    y distribuye equitativamente entre los workers disponibles
     """
+    # Calcular artículos por worker
+    articulos_por_worker = max(1, num_articulos // NUM_WORKERS)
+    
     # Calcular la relación tiendas/artículos
     ratio = num_tiendas / num_articulos if num_articulos > 0 else float('inf')
     
     # Ajustar el tamaño del bloque según la relación
     if ratio > 10:  # Muchas tiendas, pocos artículos
-        # Asegurar que tengamos al menos NUM_WORKERS bloques
-        tiendas_por_bloque = max(1, num_tiendas // (NUM_WORKERS * 4))
+        tiendas_por_bloque = max(1, num_tiendas // NUM_WORKERS)
         return (tiendas_por_bloque, 1)  # (tiendas_por_bloque, articulos_por_bloque)
     elif ratio < 0.1:  # Pocas tiendas, muchos artículos
-        # Asegurar que tengamos al menos NUM_WORKERS bloques
-        articulos_por_bloque = max(1, num_articulos // (NUM_WORKERS * 4))
-        return (1, articulos_por_bloque)  # (tiendas_por_bloque, articulos_por_bloque)
+        return (1, articulos_por_worker)  # (tiendas_por_bloque, articulos_por_bloque)
     else:  # Relación balanceada
-        return (50, 50)  # (tiendas_por_bloque, articulos_por_bloque)
+        # Distribuir equitativamente tanto tiendas como artículos
+        tiendas_por_bloque = max(1, num_tiendas // NUM_WORKERS)
+        return (tiendas_por_bloque, articulos_por_worker)
 
 async def calcular_proyeccion(datos_ventas: List[DatoVentaDiaria], by_store: bool = True) -> ProyeccionOutput:
     """

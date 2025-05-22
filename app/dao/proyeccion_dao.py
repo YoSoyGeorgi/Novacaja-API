@@ -9,14 +9,15 @@ from concurrent.futures import ProcessPoolExecutor
 import logging
 from functools import partial
 import multiprocessing
+import psutil
 
 # Configurar logger
 logger = logging.getLogger(__name__)
 
 # Constantes para optimización
-MAX_WORKERS = multiprocessing.cpu_count()  # Usar todos los núcleos disponibles
+MAX_WORKERS = len(psutil.cpu_freq(percpu=True))  # Usar núcleos físicos disponibles
 print(MAX_WORKERS)
-BATCH_SIZE = 1000  # Tamaño de lote para procesamiento en paralelo
+BATCH_SIZE = 100  # Tamaño de lote reducido para mejor distribución
 
 class ProyeccionDAO:
     @staticmethod
