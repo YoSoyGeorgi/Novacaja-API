@@ -23,8 +23,9 @@ logger = logging.getLogger(__name__)
 # Constantes para optimización
 MAX_MEMORY_PERCENT = 90  # Porcentaje máximo de memoria a utilizar
 MIN_MEMORY_REQUIRED_MB = 1024  # Memoria mínima requerida en MB
-NUM_WORKERS = len(psutil.cpu_freq(percpu=True))  # Número de workers (uno por núcleo físico)
-print(NUM_WORKERS)
+# Usar menos workers para evitar conflictos con Prophet/Stan
+NUM_WORKERS = min(4, len(psutil.cpu_freq(percpu=True)))  # Máximo 4 workers para evitar problemas
+print(f"Using {NUM_WORKERS} workers for parallel processing")
 MIN_SERIES_LENGTH = 2
 
 def calcular_tamano_bloque(num_tiendas: int, num_articulos: int) -> tuple:

@@ -10,11 +10,11 @@ import logging
 from functools import lru_cache
 import time
 import os
-import tempfile
 
-# Configure Stan for better parallel processing
-os.environ['STAN_NUM_THREADS'] = '1'  # Prevent Stan from using multiple threads per model
-os.environ['CMDSTAN_NO_BOOST_LIB'] = '1'  # Avoid boost library conflicts
+# Configurar directorio temporal para Stan si no está configurado
+if 'TMPDIR' not in os.environ:
+    os.environ['TMPDIR'] = '/tmp/prophet_stan'
+    os.makedirs(os.environ['TMPDIR'], exist_ok=True)
 
 logger = logging.getLogger(__name__)
 
