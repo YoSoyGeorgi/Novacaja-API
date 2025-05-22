@@ -10,13 +10,16 @@ import logging
 from functools import partial
 import multiprocessing
 import psutil
+import time
+from datetime import datetime
 
 # Configurar logger
 logger = logging.getLogger(__name__)
 
 # Constantes para optimización
-MAX_WORKERS = len(psutil.cpu_freq(percpu=True))  # Usar núcleos físicos disponibles
-print(MAX_WORKERS)
+# Usar número de núcleos físicos en lugar de lógicos
+MAX_WORKERS = psutil.cpu_count(logical=False)  # Número de workers (uno por núcleo físico)
+print(f"Número de workers (núcleos físicos): {MAX_WORKERS}")
 # BATCH_SIZE se calculará dinámicamente en lugar de ser fijo
 
 class ProyeccionDAO:
@@ -40,6 +43,11 @@ class ProyeccionDAO:
         --------
         List[Dict[str, Any]] - Lista de resultados de proyección
         """
+        start_time = time.time()
+        print(f"\n{'='*60}")
+        print(f"INICIO DE PROCESAMIENTO: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"{'='*60}")
+        
         try:
             if not datos_ventas:
                 raise ValueError("Datos de ventas no proporcionados")
@@ -117,10 +125,26 @@ class ProyeccionDAO:
                     if batch_result:
                         resultados_validos.extend(batch_result)
                 
+                end_time = time.time()
+                total_time = end_time - start_time
+                
+                print(f"\n{'='*60}")
+                print(f"FIN DE PROCESAMIENTO: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                print(f"Tiempo total de ejecución: {total_time:.2f} segundos")
+                print(f"Series procesadas: {len(resultados_validos)}")
+                print(f"Series por segundo: {len(resultados_validos)/total_time:.2f}")
+                print(f"{'='*60}\n")
+                
                 return resultados_validos
             
         except Exception as e:
+            end_time = time.time()
+            total_time = end_time - start_time
             logger.error(f"Error al obtener la proyección: {str(e)}")
+            print(f"\n{'='*60}")
+            print(f"ERROR EN PROCESAMIENTO: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"Tiempo hasta el error: {total_time:.2f} segundos")
+            print(f"{'='*60}\n")
             raise Exception(f"Error al obtener la proyección: {str(e)}")
     
     @staticmethod

@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 # Constantes para optimización
 MAX_MEMORY_PERCENT = 90  # Porcentaje máximo de memoria a utilizar
 MIN_MEMORY_REQUIRED_MB = 1024  # Memoria mínima requerida en MB
-NUM_WORKERS = len(psutil.cpu_freq(percpu=True))  # Número de workers (uno por núcleo físico)
-print(NUM_WORKERS)
+NUM_WORKERS = psutil.cpu_count(logical=False)  # Número de workers (uno por núcleo físico)
+print(f"Número de workers (núcleos físicos): {NUM_WORKERS}")
 MIN_SERIES_LENGTH = 2
 
 async def calcular_proyeccion(datos_ventas: List[DatoVentaDiaria], by_store: bool = True, parametros_especiales: Optional[List[Dict]] = None) -> ProyeccionOutput:
@@ -32,6 +32,11 @@ async def calcular_proyeccion(datos_ventas: List[DatoVentaDiaria], by_store: boo
     Servicio optimizado para calcular la proyección de ventas y stock recomendado
     El batching óptimo se maneja en la capa DAO para mejor distribución de CPU
     """
+    start_time = time.time()
+    print(f"\n{'='*60}")
+    print(f"INICIO DEL SERVICIO: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"{'='*60}")
+    
     try:
         # Verificar memoria disponible
         memoria_disponible_mb = psutil.virtual_memory().available / (1024 * 1024)
@@ -164,6 +169,16 @@ async def calcular_proyeccion(datos_ventas: List[DatoVentaDiaria], by_store: boo
             for r in resultados_totales
         ]
 
+        end_time = time.time()
+        total_time = end_time - start_time
+        
+        print(f"\n{'='*60}")
+        print(f"FIN DEL SERVICIO: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"Tiempo total del servicio: {total_time:.2f} segundos")
+        print(f"Series procesadas: {len(resultados_formateados)}")
+        print(f"Series por segundo: {len(resultados_formateados)/total_time:.2f}")
+        print(f"{'='*60}\n")
+
         return ProyeccionOutput(
             resultados=resultados_formateados,
             fecha_calculo=datetime.now(),
@@ -171,10 +186,22 @@ async def calcular_proyeccion(datos_ventas: List[DatoVentaDiaria], by_store: boo
         )
 
     except HTTPException as he:
+        end_time = time.time()
+        total_time = end_time - start_time
         logger.error(f"Error HTTP en proyección: {str(he.detail)}")
+        print(f"\n{'='*60}")
+        print(f"ERROR EN SERVICIO: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"Tiempo hasta el error: {total_time:.2f} segundos")
+        print(f"{'='*60}\n")
         raise he
     except Exception as e:
+        end_time = time.time()
+        total_time = end_time - start_time
         logger.error(f"Error al calcular proyección: {str(e)}")
+        print(f"\n{'='*60}")
+        print(f"ERROR EN SERVICIO: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"Tiempo hasta el error: {total_time:.2f} segundos")
+        print(f"{'='*60}\n")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error al calcular proyección: {str(e)}"
