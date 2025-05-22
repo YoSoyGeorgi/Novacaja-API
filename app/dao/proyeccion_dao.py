@@ -73,6 +73,17 @@ class ProyeccionDAO:
             logger.info(f"Procesando {total_series} series con {MAX_WORKERS} workers, "
                        f"batch_size={batch_size}, total_batches={num_batches_final}")
             
+            # Imprimir información detallada de formación de batches
+            print(f"\n{'='*60}")
+            print(f"CONFIGURACIÓN DE BATCHES")
+            print(f"{'='*60}")
+            print(f"Total de series a procesar: {total_series}")
+            print(f"Número de workers (CPUs): {MAX_WORKERS}")
+            print(f"Tamaño de batch calculado: {batch_size}")
+            print(f"Número total de batches: {num_batches_final}")
+            print(f"Series por worker (promedio): {total_series / MAX_WORKERS:.2f}")
+            print(f"{'='*60}\n")
+            
             # Dividir los datos en lotes optimizados para procesamiento en paralelo
             batches = [datos_ventas[i:i + batch_size] for i in range(0, len(datos_ventas), batch_size)]
             
