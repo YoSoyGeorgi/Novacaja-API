@@ -135,7 +135,7 @@ class ProyeccionDAO:
         """
         try:
             # Verificar si hay suficientes datos para Prophet
-            if df['ds'].nunique() < 2:
+            if len(df) < 2:
                 return ProyeccionDAO._generar_proyeccion_simple(df, store_id, art_codigo, by_store)
             
             # Crear DataFrame con el formato requerido por run_forecast
@@ -161,6 +161,15 @@ class ProyeccionDAO:
             
             # Obtener la clave correcta del resultado
             key = f"{store_id}_{art_codigo}" if by_store else art_codigo
+            
+            # Si no hay resultados para la clave, intentar buscar por artículo
+            if not resultados.get(key) and not by_store:
+                # Buscar cualquier resultado que contenga el código del artículo
+                for k, v in resultados.items():
+                    if str(art_codigo) in str(k):
+                        key = k
+                        break
+            
             data = resultados.get(key, {})
             
             if not data:
@@ -184,7 +193,7 @@ class ProyeccionDAO:
             
         except Exception as e:
             logger.error(f"Error procesando serie {store_id}-{art_codigo}: {str(e)}")
-            raise
+            return None  # Retornar None en lugar de lanzar la excepción
     
     @staticmethod
     def _generar_proyeccion_simple(df: pd.DataFrame, store_id: str, art_codigo: str, by_store: bool) -> Dict[str, Any]:
@@ -206,42 +215,46 @@ class ProyeccionDAO:
         --------
         Dict[str, Any] - Resultado de la proyección simple
         """
-        # Calcular estadísticas básicas
-        valor_medio = df['y'].mean()
-        desv_est = df['y'].std() if len(df) > 1 else valor_medio * 0.2
-        
-        # Factor de confianza para nivel de servicio 0.95
-        z_score = 1.645
-        
-        # Calcular proyecciones
-        demanda_7d = round(valor_medio * 7)
-        demanda_30d = round(valor_medio * 30)
-        
-        # Calcular stock de seguridad
-        stock_seg_7d = round(z_score * desv_est * np.sqrt(7))
-        stock_seg_30d = round(z_score * desv_est * np.sqrt(30))
-        
-        # Calcular stock recomendado
-        stock_rec_7d = demanda_7d + stock_seg_7d
-        stock_rec_30d = demanda_30d + stock_seg_30d
-        
-        # Calcular intervalos de confianza
-        intervalo_inf = max(0, round(valor_medio - z_score * desv_est))
-        intervalo_sup = round(valor_medio + z_score * desv_est)
-        
-        return {
-            "id_sucursal": store_id if by_store else "global",
-            "art_codigo": art_codigo,
-            "demanda_pronosticada_7d": demanda_7d,
-            "demanda_pronosticada_30d": demanda_30d,
-            "stock_seguridad_7d": stock_seg_7d,
-            "stock_seguridad_30d": stock_seg_30d,
-            "stock_recomendado_7d": stock_rec_7d,
-            "stock_recomendado_30d": stock_rec_30d,
-            "intervalo_confianza_inferior": intervalo_inf,
-            "intervalo_confianza_superior": intervalo_sup,
-            "tendencia": "estable"
-        }
+        try:
+            # Calcular estadísticas básicas
+            valor_medio = df['y'].mean() if not df.empty else 0
+            desv_est = df['y'].std() if len(df) > 1 else valor_medio * 0.2 if valor_medio > 0 else 0
+            
+            # Factor de confianza para nivel de servicio 0.95
+            z_score = 1.645
+            
+            # Calcular proyecciones
+            demanda_7d = round(valor_medio * 7)
+            demanda_30d = round(valor_medio * 30)
+            
+            # Calcular stock de seguridad
+            stock_seg_7d = round(z_score * desv_est * np.sqrt(7))
+            stock_seg_30d = round(z_score * desv_est * np.sqrt(30))
+            
+            # Calcular stock recomendado
+            stock_rec_7d = demanda_7d + stock_seg_7d
+            stock_rec_30d = demanda_30d + stock_seg_30d
+            
+            # Calcular intervalos de confianza
+            intervalo_inf = max(0, round(valor_medio - z_score * desv_est))
+            intervalo_sup = round(valor_medio + z_score * desv_est)
+            
+            return {
+                "id_sucursal": store_id if by_store else "global",
+                "art_codigo": art_codigo,
+                "demanda_pronosticada_7d": demanda_7d,
+                "demanda_pronosticada_30d": demanda_30d,
+                "stock_seguridad_7d": stock_seg_7d,
+                "stock_seguridad_30d": stock_seg_30d,
+                "stock_recomendado_7d": stock_rec_7d,
+                "stock_recomendado_30d": stock_rec_30d,
+                "intervalo_confianza_inferior": intervalo_inf,
+                "intervalo_confianza_superior": intervalo_sup,
+                "tendencia": "estable"
+            }
+        except Exception as e:
+            logger.error(f"Error en proyección simple para {store_id}-{art_codigo}: {str(e)}")
+            return None
 
     @staticmethod
     def obtener_proyeccion_sync(datos_ventas: list, by_store: bool = True):
