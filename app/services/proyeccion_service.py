@@ -84,9 +84,10 @@ async def calcular_proyeccion(datos_ventas: List[DatoVentaDiaria], by_store: boo
 
         # Validar límite de tiendas
         if num_tiendas > 2500:
+            logger.warning(f"Se excedió el límite de tiendas. Tiendas recibidas: {num_tiendas}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Límite de tiendas excedido, por favor reduzca la cantidad"
+                detail=f"Límite de tiendas excedido. Se recibieron {num_tiendas} tiendas, el máximo permitido es 2500"
             )
 
         # Calcular tamaño óptimo de bloques
@@ -205,6 +206,7 @@ async def calcular_proyeccion(datos_ventas: List[DatoVentaDiaria], by_store: boo
         )
 
     except HTTPException as he:
+        logger.error(f"Error HTTP en proyección: {str(he.detail)}")
         raise he
     except Exception as e:
         logger.error(f"Error al calcular proyección: {str(e)}")
