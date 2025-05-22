@@ -413,8 +413,13 @@ def run_forecast(input_df: pd.DataFrame, by_store: bool = True, nivel_servicio: 
                     continue
         else:
             # Procesar por artículo (sumando todas las tiendas)
-            # Primero agrupar todos los datos por fecha y artículo
-            df_agrupado = input_df.groupby(['ds', 'art_codigo'])['y'].sum().reset_index()
+            # Primero agrupar todos los datos por fecha y artículo, asegurando que no haya duplicados
+            df_agrupado = input_df.groupby(['ds', 'art_codigo'], as_index=False)['y'].sum()
+            
+            # Verificar que no haya duplicados
+            if df_agrupado.duplicated(['ds', 'art_codigo']).any():
+                logger.warning("Se encontraron duplicados en los datos agrupados. Eliminando duplicados...")
+                df_agrupado = df_agrupado.drop_duplicates(['ds', 'art_codigo'])
             
             # Luego procesar cada artículo
             for art_codigo, group_data in df_agrupado.groupby('art_codigo'):
