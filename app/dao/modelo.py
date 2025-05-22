@@ -9,6 +9,12 @@ from typing import Tuple, Dict, Any, Optional
 import logging
 from functools import lru_cache
 import time
+import os
+import tempfile
+
+# Configure Stan for better parallel processing
+os.environ['STAN_NUM_THREADS'] = '1'  # Prevent Stan from using multiple threads per model
+os.environ['CMDSTAN_NO_BOOST_LIB'] = '1'  # Avoid boost library conflicts
 
 logger = logging.getLogger(__name__)
 
