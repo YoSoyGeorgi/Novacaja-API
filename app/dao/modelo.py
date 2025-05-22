@@ -413,13 +413,16 @@ def run_forecast(input_df: pd.DataFrame, by_store: bool = True, nivel_servicio: 
                     continue
         else:
             # Procesar por artículo (sumando todas las tiendas)
-            for art_codigo, group_data in input_df.groupby('art_codigo'):
+            # Primero agrupar todos los datos por fecha y artículo
+            df_agrupado = input_df.groupby(['ds', 'art_codigo'])['y'].sum().reset_index()
+            
+            # Luego procesar cada artículo
+            for art_codigo, group_data in df_agrupado.groupby('art_codigo'):
                 try:
                     tiempo_inicio = time.time()
                     
-                    # Preparar datos - sumar ventas de todas las tiendas
-                    df = group_data.groupby('ds')['y'].sum().reset_index()
-                    df.columns = ['ds', 'y']
+                    # Preparar datos - ya están sumados por fecha
+                    df = group_data[['ds', 'y']].copy()
                     
                     # Verificar si hay suficientes datos
                     if len(df) < 2:
