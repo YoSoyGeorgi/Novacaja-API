@@ -27,32 +27,10 @@ NUM_WORKERS = len(psutil.cpu_freq(percpu=True))  # Número de workers (uno por n
 print(NUM_WORKERS)
 MIN_SERIES_LENGTH = 2
 
-def calcular_tamano_bloque(num_tiendas: int, num_articulos: int) -> tuple:
-    """
-    Calcula el tamaño óptimo de los bloques basado en la relación tiendas/artículos
-    y distribuye equitativamente entre los workers disponibles
-    """
-    # Calcular artículos por worker
-    articulos_por_worker = max(1, num_articulos // NUM_WORKERS)
-    
-    # Calcular la relación tiendas/artículos
-    ratio = num_tiendas / num_articulos if num_articulos > 0 else float('inf')
-    
-    # Ajustar el tamaño del bloque según la relación
-    if ratio > 10:  # Muchas tiendas, pocos artículos
-        tiendas_por_bloque = max(1, num_tiendas // NUM_WORKERS)
-        return (tiendas_por_bloque, 1)  # (tiendas_por_bloque, articulos_por_bloque)
-    elif ratio < 0.1:  # Pocas tiendas, muchos artículos
-        return (1, articulos_por_worker)  # (tiendas_por_bloque, articulos_por_bloque)
-    else:  # Relación balanceada
-        # Distribuir equitativamente tanto tiendas como artículos
-        tiendas_por_bloque = max(1, num_tiendas // NUM_WORKERS)
-        return (tiendas_por_bloque, articulos_por_worker)
-
 async def calcular_proyeccion(datos_ventas: List[DatoVentaDiaria], by_store: bool = True, parametros_especiales: Optional[List[Dict]] = None) -> ProyeccionOutput:
     """
     Servicio optimizado para calcular la proyección de ventas y stock recomendado
-    con procesamiento por bloques dinámicos
+    El batching óptimo se maneja en la capa DAO para mejor distribución de CPU
     """
     try:
         # Verificar memoria disponible
@@ -98,107 +76,69 @@ async def calcular_proyeccion(datos_ventas: List[DatoVentaDiaria], by_store: boo
                 detail=f"Límite de artículos excedido. Se recibieron {num_articulos} artículos, el máximo permitido es 2500"
             )
 
-        # Calcular tamaño óptimo de bloques
-        tiendas_por_bloque, articulos_por_bloque = calcular_tamano_bloque(num_tiendas, num_articulos)
+        logger.info(f"Procesando {num_tiendas} tiendas y {num_articulos} artículos")
 
-        # Crear bloques de datos
-        bloques = []
+        # Preparar las series temporales para el DAO
+        series_temporales = []
+        
         if by_store:
-            # Agrupar por tienda
-            tiendas_grupos = list(df.groupby('store_id'))
-            # Dividir tiendas en bloques más pequeños
-            for i in range(0, len(tiendas_grupos), tiendas_por_bloque):
-                bloque_tiendas = tiendas_grupos[i:i + tiendas_por_bloque]
-                articulos_bloque = []
-                for store_id, grupo_tienda in bloque_tiendas:
-                    for art_codigo, grupo_producto in grupo_tienda.groupby('art_codigo'):
-                        if len(grupo_producto) >= MIN_SERIES_LENGTH:
-                            # Buscar parámetros especiales para este artículo/tienda
-                            parametros = None
-                            if parametros_especiales:
-                                for param in parametros_especiales:
-                                    if param['art_codigo'] == art_codigo and param['store_id'] == store_id:
-                                        parametros = param
-                                        break
-                            
-                            articulos_bloque.append({
-                                "store_id": store_id,
-                                "art_codigo": art_codigo,
-                                "ds": grupo_producto['ds'].tolist(),
-                                "y": grupo_producto['y'].tolist(),
-                                "parametros_especiales": parametros
-                            })
-                if articulos_bloque:
-                    bloques.append(articulos_bloque)
+            # Agrupar por tienda y artículo
+            for (store_id, art_codigo), grupo in df.groupby(['store_id', 'art_codigo']):
+                if len(grupo) >= MIN_SERIES_LENGTH:
+                    # Buscar parámetros especiales para este artículo/tienda
+                    parametros = None
+                    if parametros_especiales:
+                        for param in parametros_especiales:
+                            if param.get('art_codigo') == art_codigo and param.get('store_id') == store_id:
+                                parametros = param
+                                break
+                    
+                    serie = {
+                        "store_id": store_id,
+                        "art_codigo": art_codigo,
+                        "ds": grupo['ds'].tolist(),
+                        "y": grupo['y'].tolist()
+                    }
+                    if parametros:
+                        serie["parametros_especiales"] = parametros
+                    
+                    series_temporales.append(serie)
         else:
-            # Agrupar por artículo
-            articulos_grupos = list(df.groupby('art_codigo'))
-            # Dividir artículos en bloques más pequeños
-            for i in range(0, len(articulos_grupos), articulos_por_bloque):
-                bloque_articulos = articulos_grupos[i:i + articulos_por_bloque]
-                articulos_bloque = []
-                for art_codigo, grupo_articulo in bloque_articulos:
-                    if len(grupo_articulo) >= MIN_SERIES_LENGTH:
-                        # Buscar parámetros especiales para este artículo
-                        parametros = None
-                        if parametros_especiales:
-                            for param in parametros_especiales:
-                                if param['art_codigo'] == art_codigo:
-                                    parametros = param
-                                    break
-                        
-                        articulos_bloque.append({
-                            "store_id": "global",
-                            "art_codigo": art_codigo,
-                            "ds": grupo_articulo['ds'].tolist(),
-                            "y": grupo_articulo['y'].tolist(),
-                            "parametros_especiales": parametros
-                        })
-                if articulos_bloque:
-                    bloques.append(articulos_bloque)
+            # Agrupar solo por artículo
+            for art_codigo, grupo in df.groupby('art_codigo'):
+                if len(grupo) >= MIN_SERIES_LENGTH:
+                    # Buscar parámetros especiales para este artículo
+                    parametros = None
+                    if parametros_especiales:
+                        for param in parametros_especiales:
+                            if param.get('art_codigo') == art_codigo:
+                                parametros = param
+                                break
+                    
+                    serie = {
+                        "store_id": "global",
+                        "art_codigo": art_codigo,
+                        "ds": grupo['ds'].tolist(),
+                        "y": grupo['y'].tolist()
+                    }
+                    if parametros:
+                        serie["parametros_especiales"] = parametros
+                    
+                    series_temporales.append(serie)
 
-        # Asegurar que tengamos suficientes bloques para los workers
-        if len(bloques) < NUM_WORKERS:
-            # Dividir los bloques existentes en más bloques más pequeños
-            bloques_originales = bloques
-            bloques = []
-            for bloque in bloques_originales:
-                # Dividir cada bloque en NUM_WORKERS partes
-                tamano_parte = max(1, len(bloque) // NUM_WORKERS)
-                for i in range(0, len(bloque), tamano_parte):
-                    parte = bloque[i:i + tamano_parte]
-                    if parte:
-                        bloques.append(parte)
+        logger.info(f"Preparadas {len(series_temporales)} series temporales para procesar")
 
-        # Procesar bloques en paralelo
-        resultados_totales = []
-        with ProcessPoolExecutor(max_workers=NUM_WORKERS) as executor:
-            # Crear un diccionario para rastrear qué worker está procesando qué bloque
-            worker_assignments = {}
-            
-            # Asignar bloques a workers de manera round-robin
-            futures = []
-            for i, bloque in enumerate(bloques):
-                worker_id = i % NUM_WORKERS
-                future = executor.submit(
-                    ProyeccionDAO.obtener_proyeccion_sync,
-                    bloque,
-                    by_store
-                )
-                futures.append(future)
-                worker_assignments[future] = worker_id
+        if not series_temporales:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No hay series temporales con suficientes datos para procesar"
+            )
 
-            # Recolectar resultados
-            for future in as_completed(futures):
-                try:
-                    resultados_bloque = future.result()
-                    if resultados_bloque:
-                        resultados_totales.extend(resultados_bloque)
-                except Exception as e:
-                    logger.error(f"Error procesando bloque en worker {worker_assignments[future]}: {str(e)}")
-                    continue
-                finally:
-                    gc.collect()
+        # Delegar el procesamiento al DAO con su estrategia de batching optimizada
+        resultados_totales = await ProyeccionDAO.obtener_proyeccion(
+            datos_ventas=series_temporales,
+            by_store=by_store
+        )
 
         if not resultados_totales:
             raise HTTPException(
