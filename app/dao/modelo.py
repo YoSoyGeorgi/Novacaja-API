@@ -9,6 +9,9 @@ from typing import Tuple, Dict, Any, Optional
 import logging
 from functools import lru_cache
 import time
+import os
+
+os.environ['PROPHET_BACKEND'] = 'PYSTAN'
 
 logger = logging.getLogger(__name__)
 

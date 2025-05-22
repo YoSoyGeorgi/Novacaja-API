@@ -4,6 +4,8 @@ FROM python:3.11-slim
 # Directorio de trabajo
 WORKDIR /app
 
+ENV PROPHET_BACKEND PYSTAN
+
 # Copia solo requirements y actualiza pip antes de instalar
 COPY requirements.txt .
 # Copia los archivos y carpetas necesarios al contenedor
