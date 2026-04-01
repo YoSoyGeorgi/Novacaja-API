@@ -431,8 +431,38 @@ def run_forecast(input_df: pd.DataFrame, by_store: bool = True, nivel_servicio: 
                     tiempos_procesamiento[f"{store_id}_{art_codigo}"] = time.time() - tiempo_inicio
                     
                 except Exception as e:
-                    logger.error(f"Error procesando serie {store_id}-{art_codigo}: {str(e)}")
-                    continue
+                    logger.warning(f"Prophet falló para serie {store_id}-{art_codigo}, usando modelo simple: {str(e)}")
+                    try:
+                        df_fb = preparar_datos_para_clave(group_data, (store_id, art_codigo))
+                        df_fb = df_fb.set_index('ds').resample('D').sum().fillna(0).reset_index()
+                        demanda_7d, demanda_30d, desv_est, z_score = modelo_simple(df_fb)
+                        pronostico_7d = demanda_7d
+                        pronostico_30d = demanda_30d
+                        stock_seg_7d = z_score * desv_est * np.sqrt(7)
+                        stock_seg_30d = z_score * desv_est * np.sqrt(30)
+                        stock_rec_7d = max(0, pronostico_7d + stock_seg_7d)
+                        stock_rec_30d = max(0, pronostico_30d + stock_seg_30d)
+                        ci_95 = np.array([
+                            [max(0, pronostico_7d - z_score * desv_est), max(0, pronostico_7d + z_score * desv_est)],
+                            [max(0, pronostico_30d - z_score * desv_est), max(0, pronostico_30d + z_score * desv_est)]
+                        ])
+                        result = {
+                            'demanda_pronosticada': {'7d': int(np.ceil(pronostico_7d)), '30d': int(np.ceil(pronostico_30d))},
+                            'stock_seguridad': {'7d': int(np.ceil(stock_seg_7d)), '30d': int(np.ceil(stock_seg_30d))},
+                            'stock_recomendado': {'7d': int(np.ceil(stock_rec_7d)), '30d': int(np.ceil(stock_rec_30d))},
+                            'intervalos_confianza': {'95': {'inferior': int(np.ceil(ci_95[:, 0].mean())), 'superior': int(np.ceil(ci_95[:, 1].mean()))}},
+                            'insights': {
+                                'tendencia': 'estable',
+                                'modelo_usado': 'simple_fallback',
+                                'nivel_servicio': nivel_servicio,
+                                'tiempo_procesamiento': time.time() - tiempo_inicio
+                            }
+                        }
+                        results[f"{store_id}_{art_codigo}"] = result
+                        tiempos_procesamiento[f"{store_id}_{art_codigo}"] = time.time() - tiempo_inicio
+                    except Exception as fallback_err:
+                        logger.error(f"Error en fallback para serie {store_id}-{art_codigo}: {str(fallback_err)}")
+                        continue
         else:
             # Procesar por artículo (sumando todas las tiendas)
             # Primero agrupar y sumar todas las ventas por fecha para cada artículo
@@ -591,8 +621,39 @@ def run_forecast(input_df: pd.DataFrame, by_store: bool = True, nivel_servicio: 
                     articulos_procesados.add(art_codigo)
             
                 except Exception as e:
-                    logger.error(f"Error procesando artículo {art_codigo}: {str(e)}")
-                    continue
+                    logger.warning(f"Prophet falló para artículo {art_codigo}, usando modelo simple: {str(e)}")
+                    try:
+                        df_fb = group_data[['ds', 'y']].copy()
+                        df_fb = df_fb.set_index('ds').resample('D').sum().fillna(0).reset_index()
+                        demanda_7d, demanda_30d, desv_est, z_score = modelo_simple(df_fb)
+                        pronostico_7d = demanda_7d
+                        pronostico_30d = demanda_30d
+                        stock_seg_7d = z_score * desv_est * np.sqrt(7)
+                        stock_seg_30d = z_score * desv_est * np.sqrt(30)
+                        stock_rec_7d = max(0, pronostico_7d + stock_seg_7d)
+                        stock_rec_30d = max(0, pronostico_30d + stock_seg_30d)
+                        ci_95 = np.array([
+                            [max(0, pronostico_7d - z_score * desv_est), max(0, pronostico_7d + z_score * desv_est)],
+                            [max(0, pronostico_30d - z_score * desv_est), max(0, pronostico_30d + z_score * desv_est)]
+                        ])
+                        result = {
+                            'demanda_pronosticada': {'7d': int(np.ceil(pronostico_7d)), '30d': int(np.ceil(pronostico_30d))},
+                            'stock_seguridad': {'7d': int(np.ceil(stock_seg_7d)), '30d': int(np.ceil(stock_seg_30d))},
+                            'stock_recomendado': {'7d': int(np.ceil(stock_rec_7d)), '30d': int(np.ceil(stock_rec_30d))},
+                            'intervalos_confianza': {'95': {'inferior': int(np.ceil(ci_95[:, 0].mean())), 'superior': int(np.ceil(ci_95[:, 1].mean()))}},
+                            'insights': {
+                                'tendencia': 'estable',
+                                'modelo_usado': 'simple_fallback',
+                                'nivel_servicio': nivel_servicio,
+                                'tiempo_procesamiento': time.time() - tiempo_inicio
+                            }
+                        }
+                        results[art_codigo] = result
+                        tiempos_procesamiento[art_codigo] = time.time() - tiempo_inicio
+                        articulos_procesados.add(art_codigo)
+                    except Exception as fallback_err:
+                        logger.error(f"Error en fallback para artículo {art_codigo}: {str(fallback_err)}")
+                        continue
     
         if not results:
             raise ValueError("No se pudo procesar ninguna serie temporal")
