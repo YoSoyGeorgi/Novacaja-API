@@ -13,7 +13,7 @@ COPY /app/README.md /app/README.md
 
 # 1. Instala build-tools (si lo necesitas)
 RUN apt-get update \
- && apt-get install -y build-essential libatlas-base-dev gfortran \
+ && apt-get install -y build-essential libopenblas-dev gfortran \
  && rm -rf /var/lib/apt/lists/*
 
 # 2. Actualiza pip y empaquetadores
